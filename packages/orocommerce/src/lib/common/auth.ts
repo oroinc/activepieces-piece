@@ -1,7 +1,7 @@
 import { PieceAuth, Property } from '@activepieces/pieces-framework';
 import { HttpMethod, HttpResponse, HttpMessageBody } from '@activepieces/pieces-common';
 import { oroApiCall } from './client';
-import { AppConnectionType, tryCatch } from '@activepieces/shared';
+import { AppConnectionType, tryCatch } from '@activepieces/pieces-framework';
 
 export const oroAuth = PieceAuth.CustomAuth({
   description: `

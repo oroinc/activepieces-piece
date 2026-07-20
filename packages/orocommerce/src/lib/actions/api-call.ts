@@ -1,6 +1,10 @@
 import { createCustomApiCallAction } from '@activepieces/pieces-common';
-import { tryCatchSync } from '@activepieces/shared';
-import { oroAuth, getOroAdminApiBaseUrl, getAccessToken } from '../common';
+import {
+  getAccessToken,
+  getOroAdminApiBaseUrl,
+  oroAuth,
+  tryCatchSync,
+} from '../common';
 
 export const customApiCallAction = createCustomApiCallAction({
   auth: oroAuth,

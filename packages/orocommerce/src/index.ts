@@ -1,5 +1,5 @@
 import { createPiece } from '@activepieces/pieces-framework';
-import { PieceCategory } from '@activepieces/shared';
+import { PieceCategory } from '@activepieces/pieces-framework';
 import { oroAuth } from './lib/common';
 import { oroWebhookTopicTrigger } from './lib/triggers/webhook-topic-trigger';
 import {

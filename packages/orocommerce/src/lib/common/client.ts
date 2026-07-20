@@ -6,7 +6,6 @@ import {
   HttpError,
   AuthenticationType,
 } from '@activepieces/pieces-common';
-import { tryCatchSync } from '@activepieces/shared';
 
 import {
   type OroAuth,
@@ -17,6 +16,7 @@ import {
   type FetchCollectionParams,
 } from './types';
 import { jsonApiBodyUtils } from './jsonapi-body-utils';
+import { tryCatchSync } from './try-catch';
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
