@@ -4,7 +4,7 @@ import {
   oroAuth,
   oroApiCall,
   customerDropdown,
-  customerUserRoleDropdown,
+  customerUserRolesMultiDropdown,
   organizationDropdown,
   userDropdown,
   websiteDropdown,
@@ -13,7 +13,7 @@ import {
   additionalHeadersProp,
 } from '../common';
 import { OroAuth } from '../common/types';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const updateCustomerUserAction = createAction({
   auth: oroAuth,
@@ -88,7 +88,7 @@ export const updateCustomerUserAction = createAction({
     // -- Relationships ---------------------------------------------------------
     customer: customerDropdown,
     website: websiteDropdown,
-    userRoles: customerUserRoleDropdown,
+    userRoles: customerUserRolesMultiDropdown,
     owner: userDropdown,
     organization: organizationDropdown,
     additionalAttributes: additionalAttributesProp,

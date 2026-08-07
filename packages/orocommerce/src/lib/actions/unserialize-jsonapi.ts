@@ -5,18 +5,12 @@ export const unserializeJsonApiAction = createAction({
   name: 'unserialize_jsonapi',
   displayName: 'Unserialize JSON:API Response',
   description:
-    'Flattens a JSON:API response body into a plain object (or array of objects). ' +
-    'Included relationships are resolved and inlined. Unresolved relationship ' +
-    'references are kept as { _type, id } stubs so the document can be ' +
-    're-serialized back to a valid JSON:API request without data loss. ' +
-    'Pass the "body" output of the API Call action as the Response input.',
+    'Flattens a JSON:API response body into a plain object. Included relationships are inlined, and the result stays re-serializable.',
   auth: undefined,
   props: {
     response: Property.Json({
       displayName: 'JSON:API Response',
-      description:
-        'The raw JSON:API response body - the "body" field from the API Call action output. ' +
-        'Must contain a top-level "data" key (single resource or collection).',
+      description: 'The "body" output of the API Call action. Needs a top-level "data" key.',
       required: true,
       defaultValue: {},
     }),

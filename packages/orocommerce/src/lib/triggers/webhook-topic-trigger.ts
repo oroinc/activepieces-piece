@@ -3,9 +3,9 @@ import {
   Property,
   TriggerStrategy,
 } from '@activepieces/pieces-framework';
-import { oroAuth, oroApiCall } from '../common';
+import { oroAuth, oroApiCall, formatError } from '../common';
 import { OroAuth, OroJsonApiCollection, OroJsonApiItem } from '../common/types';
-import { HttpMethod } from '@activepieces/pieces-common';
+import { HttpError, HttpMethod } from '@activepieces/pieces-common';
 
 export const oroWebhookTopicTrigger = createTrigger({
   auth: oroAuth,
@@ -92,11 +92,23 @@ export const oroWebhookTopicTrigger = createTrigger({
     const webhookInfo = await context.store.get<WebhookInformation>('webhookInfo');
 
     if (webhookInfo !== null && webhookInfo !== undefined) {
-      await oroApiCall({
-        method: HttpMethod.DELETE,
-        resourceUri: `webhooks/${webhookInfo.webhookId}`,
-        auth: context.auth,
-      });
+      try {
+        await oroApiCall({
+          method: HttpMethod.DELETE,
+          resourceUri: `webhooks/${webhookInfo.webhookId}`,
+          auth: context.auth,
+          throwOriginalError: true,
+        });
+      } catch (error: unknown) {
+        if (error instanceof HttpError) {
+          // Skip already removed webhooks and access denied errors
+          if ([401, 403, 404].includes(error.response.status)) {
+            return;
+          }
+        }
+
+        throw new Error(formatError({ error }));
+      }
     }
   },
 

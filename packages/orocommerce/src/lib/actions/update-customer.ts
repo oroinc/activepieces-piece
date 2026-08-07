@@ -15,7 +15,7 @@ import {
   additionalHeadersProp,
 } from '../common';
 import { OroAuth } from '../common/types';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const updateCustomerAction = createAction({
   auth: oroAuth,

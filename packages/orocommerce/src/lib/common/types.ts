@@ -23,6 +23,7 @@ export type OroApiCallParams = {
   queryParams?: QueryParams;
   body?: HttpMessageBody;
   headers?: Record<string, string>;
+  throwOriginalError?: boolean;
 };
 
 export type FetchCollectionParams = {

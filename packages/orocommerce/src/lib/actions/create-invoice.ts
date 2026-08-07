@@ -13,7 +13,7 @@ import {
   additionalRelationsProp,
   additionalHeadersProp,
 } from '../common';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createInvoiceAction = createAction({
   auth: oroAuth,
@@ -239,6 +239,8 @@ export const createInvoiceAction = createAction({
       customerName: p.customerName,
       totalAmount: p.totalAmount,
       ...jsonApiBodyUtils.pickDefined({
+        refCustomerId: p.refCustomerId,
+        refCustomerUserId: p.refCustomerUserId,
         invoiceNumber: p.invoiceNumber,
         title: p.title,
         description: p.description,

@@ -1,13 +1,11 @@
-import type { JsonApiDocument, JsonApiResource, Linkage, FlatResource, DeserializeResult } from './types';
-
-/**
- * Sentinel value written by the deserializer for a null to-one relationship.
- * Carrying `_type: null` lets the serializer distinguish it from a plain
- * null attribute and round-trip it back to `{ data: null }`.
- */
-export const NULL_RELATIONSHIP: FlatResource = Object.freeze({ _type: null, id: null });
-
-// -- internal helpers -------------------------------------------------------
+import type {
+  JsonApiDocument,
+  JsonApiResource,
+  JsonApiResourceDocument,
+  Linkage,
+  FlatResource,
+  DeserializeResult,
+} from './types';
 
 function buildIndex(included: JsonApiResource[]): Map<string, JsonApiResource> {
   const m = new Map<string, JsonApiResource>();
@@ -21,7 +19,6 @@ function resolveRef(
   visited: Set<string>,
 ): FlatResource {
   const key = `${ref.type}:${ref.id}`;
-  // cycle guard or not in included -> minimal restorable stub
   if (visited.has(key)) return { _type: ref.type, id: ref.id };
   const resource = index.get(key);
   if (resource) return flattenResource(resource, index, new Set(visited));
@@ -38,13 +35,14 @@ function flattenResource(
   for (const [name, rel] of Object.entries(r.relationships ?? {})) {
     const lnk = rel.data;
     if (lnk === null || lnk === undefined) {
-      // null to-one relationship — use sentinel so serializer can restore it
       out[name] = NULL_RELATIONSHIP;
       continue;
     }
     if (Array.isArray(lnk)) {
-      // empty array stays as empty array; elements are resolved individually
-      out[name] = lnk.map((ref) => resolveRef(ref, index, new Set(visited)));
+      out[name] =
+        lnk.length === 0
+          ? EMPTY_TO_MANY
+          : lnk.map((ref) => resolveRef(ref, index, new Set(visited)));
       continue;
     }
     out[name] = resolveRef(lnk, index, new Set(visited));
@@ -52,18 +50,9 @@ function flattenResource(
   return out;
 }
 
-// -- public API -------------------------------------------------------------
-
-/**
- * Deserialize a JSON:API document into a plain flat object or array.
- *
- * - Resources in `included` are resolved and inlined.
- * - Relationship references **not** found in `included` become `{ _type, id }`
- *   stubs instead of `null`, preserving all information needed to re-serialize.
- * - Null to-one relationships become `{ _type: null, id: null }` sentinels.
- * - Circular references (e.g. order -> lineItem -> order) are broken safely.
- */
-export function deserialize(doc: JsonApiDocument): DeserializeResult | unknown {
+export function deserialize(doc: JsonApiResourceDocument): FlatResource;
+export function deserialize(doc: JsonApiDocument): DeserializeResult | JsonApiDocument;
+export function deserialize(doc: JsonApiDocument): DeserializeResult | JsonApiDocument {
   if (!doc?.data) return doc;
   const index = buildIndex(doc.included ?? []);
   if (Array.isArray(doc.data)) {
@@ -71,3 +60,9 @@ export function deserialize(doc: JsonApiDocument): DeserializeResult | unknown {
   }
   return flattenResource(doc.data, index, new Set());
 }
+
+// Sentinels: the flat shape crosses flow steps as plain JSON, where a null/empty relationship would
+// otherwise be indistinguishable from a null/empty attribute and serialize back as one.
+export const NULL_RELATIONSHIP: FlatResource = Object.freeze({ _type: null, id: null });
+
+export const EMPTY_TO_MANY: FlatResource = Object.freeze({ _emptyToMany: true });

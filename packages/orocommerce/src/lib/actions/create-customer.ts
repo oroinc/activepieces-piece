@@ -13,12 +13,13 @@ import {
   baseAddressArrayItemProps,
   addressTypeProps,
   buildIncludedAddress,
+  toAddressRow,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
 } from '../common';
 import { OroAuth } from '../common/types';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createCustomerAction = createAction({
   auth: oroAuth,
@@ -82,16 +83,21 @@ export const createCustomerAction = createAction({
   async run(context) {
     const p = context.propsValue;
 
-    const included: Record<string, unknown>[] = [];
-
-    const rawAddresses = (p.addresses ?? []) as Array<Record<string, unknown>>;
-    const addressRelData = rawAddresses.map((addr, index) => {
+    const addresses = (p.addresses ?? []).flatMap((row, index) => {
       const lid = `addr_${index + 1}`;
-      included.push(
-        buildIncludedAddress({ lid, type: 'customeraddresses', addr })
-      );
-      return { type: 'customeraddresses', id: lid };
+      const resource = buildIncludedAddress({
+        lid,
+        type: 'customeraddresses',
+        addr: toAddressRow(row),
+      });
+      return resource ? [{ lid, resource }] : [];
     });
+
+    const included = addresses.map(({ resource }) => resource);
+    const addressRelData = addresses.map(({ lid }) => ({
+      type: 'customeraddresses',
+      id: lid,
+    }));
 
     const extraAttrs = jsonApiBodyUtils.parseAdditionalAttributes(p.additionalAttributes);
     const extraRels = jsonApiBodyUtils.parseAdditionalRelations(p.additionalRelations);

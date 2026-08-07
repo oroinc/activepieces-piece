@@ -4,19 +4,20 @@ import {
   oroAuth,
   oroApiCall,
   customerRequiredDropdown,
-  customerUserRoleDropdown,
+  customerUserRolesMultiDropdown,
   organizationDropdown,
   userDropdown,
   websiteDropdown,
   baseAddressArrayItemProps,
   addressTypeProps,
   buildIncludedAddress,
+  toAddressRow,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
 } from '../common';
 import { OroAuth } from '../common/types';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createCustomerUserAction = createAction({
   auth: oroAuth,
@@ -88,7 +89,7 @@ export const createCustomerUserAction = createAction({
     }),
 
     // -- Optional relationships ------------------------------------------------
-    userRoles: customerUserRoleDropdown,
+    userRoles: customerUserRolesMultiDropdown,
     owner: userDropdown,
     organization: organizationDropdown,
 
@@ -115,16 +116,21 @@ export const createCustomerUserAction = createAction({
   async run(context) {
     const p = context.propsValue;
 
-    const included: Record<string, unknown>[] = [];
-
-    const rawAddresses = (p.addresses ?? []) as Array<Record<string, unknown>>;
-    const addressRelData = rawAddresses.map((addr, index) => {
+    const addresses = (p.addresses ?? []).flatMap((row, index) => {
       const lid = `cu_addr_${index + 1}`;
-      included.push(
-        buildIncludedAddress({ lid, type: 'customeruseraddresses', addr })
-      );
-      return { type: 'customeruseraddresses', id: lid };
+      const resource = buildIncludedAddress({
+        lid,
+        type: 'customeruseraddresses',
+        addr: toAddressRow(row),
+      });
+      return resource ? [{ lid, resource }] : [];
     });
+
+    const included = addresses.map(({ resource }) => resource);
+    const addressRelData = addresses.map(({ lid }) => ({
+      type: 'customeruseraddresses',
+      id: lid,
+    }));
 
     const extraAttrs = jsonApiBodyUtils.parseAdditionalAttributes(p.additionalAttributes);
     const extraRels = jsonApiBodyUtils.parseAdditionalRelations(p.additionalRelations);

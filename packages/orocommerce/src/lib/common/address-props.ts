@@ -1,5 +1,19 @@
 import { Property } from '@activepieces/pieces-framework';
 
+export function toAddressRow(row: unknown): AddressRow {
+  const addr: AddressRow = {};
+  if (!isRecord(row)) return addr;
+  for (const field of [...ADDRESS_TEXT_FIELDS, ...ADDRESS_REF_FIELDS]) {
+    const value = row[field];
+    if (typeof value === 'string') addr[field] = value;
+  }
+  for (const field of ADDRESS_FLAG_FIELDS) {
+    const value = row[field];
+    if (typeof value === 'boolean') addr[field] = value;
+  }
+  return addr;
+}
+
 export function buildIncludedAddress({
   lid,
   type,
@@ -8,45 +22,30 @@ export function buildIncludedAddress({
 }: {
   lid: string;
   type: string;
-  addr: Record<string, unknown>;
+  addr: AddressRow;
   extraAttributes?: Record<string, unknown>;
-}): Record<string, unknown> {
+}): Record<string, unknown> | null {
+  const hasData = [...ADDRESS_TEXT_FIELDS, ...ADDRESS_REF_FIELDS].some(
+    (f) => addr[f] != null && addr[f] !== ''
+  );
+  if (!hasData) return null;
+
   const attrs: Record<string, unknown> = {};
   const rels: Record<string, unknown> = {};
 
-  const textFields = [
-    'label',
-    'namePrefix',
-    'firstName',
-    'middleName',
-    'lastName',
-    'nameSuffix',
-    'organization',
-    'phone',
-    'street',
-    'street2',
-    'city',
-    'postalCode',
-    'customRegion',
-  ];
-  for (const f of textFields) {
+  for (const f of ADDRESS_TEXT_FIELDS) {
     if (addr[f]) attrs[f] = addr[f];
   }
-  if (addr['primary'] != null) attrs['primary'] = addr['primary'];
+  if (addr.primary != null) attrs['primary'] = addr.primary;
 
-  const types = buildAddressTypes({
-    typesBilling: addr['typesBilling'] as boolean | undefined,
-    typesShipping: addr['typesShipping'] as boolean | undefined,
-    defaultBilling: addr['defaultBilling'] as boolean | undefined,
-    defaultShipping: addr['defaultShipping'] as boolean | undefined,
-  });
+  const types = buildAddressTypes(addr);
   if (types.length > 0) attrs['types'] = types;
 
-  if (addr['country']) {
-    rels['country'] = { data: { type: 'countries', id: addr['country'] } };
+  if (addr.country) {
+    rels['country'] = { data: { type: 'countries', id: addr.country } };
   }
-  if (addr['region']) {
-    rels['region'] = { data: { type: 'regions', id: addr['region'] } };
+  if (addr.region) {
+    rels['region'] = { data: { type: 'regions', id: addr.region } };
   }
 
   return { type, id: lid, attributes: { ...extraAttributes, ...attrs }, relationships: rels };
@@ -57,16 +56,15 @@ function buildAddressTypes({
   typesShipping,
   defaultBilling,
   defaultShipping,
-}: {
-  typesBilling?: boolean;
-  typesShipping?: boolean;
-  defaultBilling?: boolean;
-  defaultShipping?: boolean;
-}): Array<{ addressType: string; default: boolean }> {
+}: AddressRow): Array<{ addressType: string; default: boolean }> {
   return [
     ...(typesBilling ? [{ addressType: 'billing', default: defaultBilling === true }] : []),
     ...(typesShipping ? [{ addressType: 'shipping', default: defaultShipping === true }] : []),
   ];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -173,4 +171,33 @@ export const addressTypeProps = {
   }),
 };
 
+const ADDRESS_TEXT_FIELDS = [
+  'label',
+  'namePrefix',
+  'firstName',
+  'middleName',
+  'lastName',
+  'nameSuffix',
+  'organization',
+  'phone',
+  'street',
+  'street2',
+  'city',
+  'postalCode',
+  'customRegion',
+] as const;
 
+const ADDRESS_REF_FIELDS = ['country', 'region'] as const;
+
+const ADDRESS_FLAG_FIELDS = [
+  'primary',
+  'typesBilling',
+  'typesShipping',
+  'defaultBilling',
+  'defaultShipping',
+] as const;
+
+export type AddressRow = Partial<
+  Record<(typeof ADDRESS_TEXT_FIELDS)[number] | (typeof ADDRESS_REF_FIELDS)[number], string | null>
+> &
+  Partial<Record<(typeof ADDRESS_FLAG_FIELDS)[number], boolean | null>>;

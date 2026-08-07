@@ -1,9 +1,11 @@
 import { createCustomApiCallAction } from '@activepieces/pieces-common';
 import {
   getAccessToken,
+  getConnectionHeaders,
+  getInternalInfrastructureHeaders,
   getOroAdminApiBaseUrl,
   oroAuth,
-  tryCatchSync,
+  toHeaderRecord,
 } from '../common';
 
 export const customApiCallAction = createCustomApiCallAction({
@@ -12,17 +14,12 @@ export const customApiCallAction = createCustomApiCallAction({
   displayName: 'Custom API Call',
   description: 'Make a direct authenticated call to the OroCommerce JSON:API.',
   baseUrl: (auth) => auth ? getOroAdminApiBaseUrl({ auth }) : '',
-  authMapping: async (auth) => {
-    const { data } = tryCatchSync(() => JSON.parse(auth.props.headers ?? '{}') as unknown);
-    const connectionHeaders =
-      typeof data === 'object' && data !== null && !Array.isArray(data)
-        ? Object.fromEntries(Object.entries(data as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
-        : {};
-    return {
-      Authorization: `Bearer ${await getAccessToken({ auth })}`,
-      ...connectionHeaders,
-    };
-  },
+  authMapping: async (auth, propsValue: Record<string, unknown>) => ({
+    ...getConnectionHeaders({ auth }),
+    ...getInternalInfrastructureHeaders({ auth }),
+    ...toHeaderRecord({ value: propsValue['headers'] }),
+    Authorization: `Bearer ${await getAccessToken({ auth })}`,
+  }),
   props: {
     headers: {
       defaultValue: {

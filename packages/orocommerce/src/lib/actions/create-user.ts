@@ -4,18 +4,18 @@ import {
   oroAuth,
   oroApiCall,
   businessUnitRequiredDropdown,
-  businessUnitDropdown,
   organizationDropdown,
-  organizationsDropdown,
-  userRoleDropdown,
-  userGroupDropdown,
   userAuthStatusDropdown,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  userRolesMultiDropdown,
+  userGroupsMultiDropdown,
+  organizationsMultiDropdown,
+  businessUnitsMultiDropdown,
 } from '../common';
 import { OroAuth } from '../common/types';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createUserAction = createAction({
   auth: oroAuth,
@@ -36,7 +36,8 @@ export const createUserAction = createAction({
     }),
     password: Property.ShortText({
       displayName: 'Password',
-      description: 'Password for the new account. Must comply with the system security policy.',
+      description:
+        'Password for the new account. Must comply with the system security policy.',
       required: true,
     }),
     firstName: Property.ShortText({
@@ -89,10 +90,10 @@ export const createUserAction = createAction({
 
     // -- Optional relationships ------------------------------------------------
     organization: organizationDropdown,
-    businessUnits: businessUnitDropdown,
-    userRoles: userRoleDropdown,
-    organizations: organizationsDropdown,
-    groups: userGroupDropdown,
+    businessUnits: businessUnitsMultiDropdown,
+    userRoles: userRolesMultiDropdown,
+    organizations: organizationsMultiDropdown,
+    groups: userGroupsMultiDropdown,
     authStatus: userAuthStatusDropdown,
 
     additionalAttributes: additionalAttributesProp,
@@ -103,8 +104,12 @@ export const createUserAction = createAction({
   async run(context) {
     const p = context.propsValue;
 
-    const extraAttrs = jsonApiBodyUtils.parseAdditionalAttributes(p.additionalAttributes);
-    const extraRels = jsonApiBodyUtils.parseAdditionalRelations(p.additionalRelations);
+    const extraAttrs = jsonApiBodyUtils.parseAdditionalAttributes(
+      p.additionalAttributes
+    );
+    const extraRels = jsonApiBodyUtils.parseAdditionalRelations(
+      p.additionalRelations
+    );
 
     const attributes = {
       username: p.username,

@@ -1,10 +1,8 @@
-import { Property } from '@activepieces/pieces-framework';
+import { DropdownState, Property, tryCatch } from '@activepieces/pieces-framework';
 import { HttpMethod } from '@activepieces/pieces-common';
 import { oroAuth } from './auth';
 import { oroApiCall, fetchCollection } from './client';
 import { OroAuth, OroJsonApiItem } from './types';
-
-// --- Shared sentinels ---------------------------------------------------------
 
 const NOT_CONNECTED = {
   disabled: true,
@@ -14,17 +12,20 @@ const NOT_CONNECTED = {
 
 const FAILED = {
   disabled: true,
-  placeholder: 'Failed to load options. Check your connection.',
+  placeholder:
+    'Could not load the list. Check the connection and its permissions for this resource.',
   options: [],
 };
 
-// --- Dropdown builders --------------------------------------------------------
+const PAGE_SIZE = 100;
+
+const MAX_PAGES = 20;
 
 function sanitizeSearch(value: string): string {
   return value.trim().replaceAll('"', '');
 }
 
-function attrLabel(...attrs: string[]): LabelFn {
+export function attrLabel(...attrs: string[]): LabelFn {
   return (item) =>
     String(
       attrs.reduce<unknown>(
@@ -53,6 +54,91 @@ function clientSideFilterAndSort({
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
+export async function loadDropdownOptions({
+  auth,
+  resourceUri,
+  labelFn,
+  fieldsParam,
+  queryParams = {},
+  exhaustive = false,
+}: {
+  auth: OroAuth | undefined;
+  resourceUri: string;
+  labelFn: LabelFn;
+  fieldsParam?: string;
+  queryParams?: Record<string, string>;
+  exhaustive?: boolean;
+}): Promise<DropdownState<string>> {
+  if (!auth) return NOT_CONNECTED;
+
+  const allParams = {
+    ...(fieldsParam
+      ? { [`fields[${resourceUri.slice(1)}]`]: fieldsParam }
+      : {}),
+    ...queryParams,
+  };
+
+  const { data, error } = await tryCatch(() =>
+    exhaustive
+      ? fetchEveryPage({ auth, resourceUri, queryParams: allParams })
+      : fetchFirstPage({ auth, resourceUri, queryParams: allParams })
+  );
+  if (error) return FAILED;
+
+  const options = data.items.map((item) => ({
+    label: labelFn(item),
+    value: item.id,
+  }));
+
+  return data.complete
+    ? { options }
+    : {
+        options,
+        placeholder: `Showing the first ${options.length} records only - more exist but are not listed`,
+      };
+}
+
+async function fetchFirstPage({
+  auth,
+  resourceUri,
+  queryParams,
+}: {
+  auth: OroAuth;
+  resourceUri: string;
+  queryParams: Record<string, string>;
+}): Promise<CollectionPages> {
+  const items = await fetchCollection({ auth, resourceUri, queryParams });
+  return { items, complete: true };
+}
+
+async function fetchEveryPage({
+  auth,
+  resourceUri,
+  queryParams,
+}: {
+  auth: OroAuth;
+  resourceUri: string;
+  queryParams: Record<string, string>;
+}): Promise<CollectionPages> {
+  const pages: OroJsonApiItem[][] = [];
+  for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber++) {
+    const page = await fetchCollection({
+      auth,
+      resourceUri,
+      queryParams: {
+        ...queryParams,
+        'page[size]': String(PAGE_SIZE),
+        'page[number]': String(pageNumber),
+      },
+    });
+    pages.push(page);
+    if (page.length < PAGE_SIZE) {
+      return { items: pages.flat(), complete: true };
+    }
+  }
+  return { items: pages.flat(), complete: false };
+}
+
 function makeSearchableDropdown({
   displayName,
   description,
@@ -71,32 +157,51 @@ function makeSearchableDropdown({
     required,
     refreshers,
     refreshOnSearch: true,
-    options: async ({ auth }, { searchValue }) => {
-      if (!auth) return NOT_CONNECTED;
-      try {
-        const params: Record<string, string> = {
-          [`fields[${resourceUri.slice(1)}]`]: fieldsParam,
+    options: ({ auth }, { searchValue }) => {
+      const trimmed = searchValue?.trim() ?? '';
+      return loadDropdownOptions({
+        auth,
+        resourceUri,
+        fieldsParam,
+        labelFn,
+        queryParams: {
           ...extraParams,
-        };
-        const trimmed = searchValue?.trim() ?? '';
-        if (trimmed.length > 0) {
-          params['filter[searchQuery]'] = searchExpr(sanitizeSearch(trimmed));
-        }
-        const items = await fetchCollection({
-          auth: auth as OroAuth,
-          resourceUri,
-          queryParams: params,
-        });
-        return {
-          options: items.map((item) => ({
-            label: labelFn(item),
-            value: item.id,
-          })),
-        };
-      } catch {
-        return FAILED;
-      }
+          ...(trimmed.length > 0
+            ? { 'filter[searchQuery]': searchExpr(sanitizeSearch(trimmed)) }
+            : {}),
+        },
+      });
     },
+  });
+}
+
+function makeMultiSelectDropdown({
+  displayName,
+  description,
+  required = false,
+  refreshers = [],
+  resourceUri,
+  fieldsParam,
+  labelFn,
+  extraParams = {},
+}: MultiSelectDropdownConfig) {
+  // No refreshOnSearch: the multi-select widget stores selections as indexes into the current
+  // options array, so a server-side search would re-map already-picked values onto other records.
+  return Property.MultiSelectDropdown({
+    auth: oroAuth,
+    displayName,
+    description,
+    required,
+    refreshers,
+    options: ({ auth }) =>
+      loadDropdownOptions({
+        auth,
+        resourceUri,
+        fieldsParam,
+        labelFn,
+        queryParams: extraParams,
+        exhaustive: true,
+      }),
   });
 }
 
@@ -114,24 +219,14 @@ function makeEnumDropdown({
     description,
     required,
     refreshers: [],
-    options: async ({ auth }) => {
-      if (!auth) return NOT_CONNECTED;
-      try {
-        const items = await fetchCollection({
-          auth: auth as OroAuth,
-          resourceUri,
-          queryParams: extraParams,
-        });
-        return {
-          options: items.map((item) => ({
-            label: labelFn(item),
-            value: item.id,
-          })),
-        };
-      } catch {
-        return FAILED;
-      }
-    },
+    options: ({ auth }) =>
+      loadDropdownOptions({
+        auth,
+        resourceUri,
+        labelFn,
+        queryParams: extraParams,
+        exhaustive: true,
+      }),
   });
 }
 
@@ -288,7 +383,7 @@ export const productDropdown = Property.Dropdown({
       const params: Record<string, string> = {
         'fields[products]': 'id,sku,status,names',
         include: 'names',
-        'fields[productnames]': 'id,string,localization',
+        'fields[productnames]': 'id,string,localization,product',
       };
       const trimmed = searchValue?.trim() ?? '';
       if (trimmed.length > 0) {
@@ -389,9 +484,6 @@ export const buildCountryDropdown = (
     },
   });
 
-// --- Regions ------------------------------------------------------------------
-// Loads all regions for the selected country once and filters client-side.
-
 export const buildRegionDropdown = ({
   countryRefresher,
   required = false,
@@ -408,34 +500,26 @@ export const buildRegionDropdown = ({
       'Region or state. Select a country first. Start typing to filter.',
     required,
     refreshers: [countryRefresher],
-    options: async (context) => {
-      const auth = context['auth'] as OroAuth | undefined;
-      const countryId = context[countryRefresher as keyof typeof context] as
-        | string
-        | undefined;
+    options: async ({ auth, ...refreshed }) => {
+      const countryId = refreshed[countryRefresher];
       if (!auth) return NOT_CONNECTED;
-      if (!countryId)
+      if (typeof countryId !== 'string' || countryId.length === 0)
         return {
           disabled: true,
           placeholder: 'Select a country first',
           options: [],
         };
-      try {
-        const items = await fetchCollection({
-          auth,
-          resourceUri: '/regions',
-          queryParams: { 'filter[country]': countryId },
-        });
-        return {
-          options: clientSideFilterAndSort({
-            items,
-            searchValue: undefined,
-            labelAttr: 'name',
-          }),
-        };
-      } catch {
-        return FAILED;
-      }
+      const state = await loadDropdownOptions({
+        auth,
+        resourceUri: '/regions',
+        labelFn: attrLabel('name'),
+        queryParams: { 'filter[country]': countryId },
+        exhaustive: true,
+      });
+      return {
+        ...state,
+        options: [...state.options].sort((a, b) => a.label.localeCompare(b.label)),
+      };
     },
   });
 
@@ -467,7 +551,6 @@ export const productUnitDropdown = makeEnumDropdown({
   description: 'Unit of measure for the product (e.g. each, set, kg).',
   resourceUri: '/productunits',
   labelFn: attrLabel('label', 'code'),
-  extraParams: { 'page[size]': '100' },
 });
 
 // --- Customer Groups ----------------------------------------------------------
@@ -492,6 +575,15 @@ export const businessUnitDropdown = makeSearchableDropdown({
   labelFn: attrLabel('name'),
 });
 
+export const businessUnitsMultiDropdown = makeMultiSelectDropdown({
+  displayName: 'Business Units (replaces all existing business units)',
+  description:
+    'The complete set of business units the user belongs to. Saving replaces the existing list, so include every business unit the user should keep.',
+  resourceUri: '/businessunits',
+  fieldsParam: 'id,name',
+  labelFn: attrLabel('name'),
+});
+
 export const businessUnitRequiredDropdown = makeSearchableDropdown({
   displayName: 'Owner (Business Unit)',
   description: 'The business unit that owns this record.',
@@ -513,6 +605,15 @@ export const userRoleDropdown = makeSearchableDropdown({
   labelFn: attrLabel('label', 'role'),
 });
 
+export const userRolesMultiDropdown = makeMultiSelectDropdown({
+  displayName: 'User Roles (replaces all existing roles)',
+  description:
+    'The complete set of back-office roles for the user. Saving replaces the existing roles, so include every role the user should keep.',
+  resourceUri: '/userroles',
+  fieldsParam: 'id,label,role',
+  labelFn: attrLabel('label', 'role'),
+});
+
 // --- User Groups --------------------------------------------------------------
 
 export const userGroupDropdown = makeSearchableDropdown({
@@ -524,6 +625,15 @@ export const userGroupDropdown = makeSearchableDropdown({
   labelFn: attrLabel('name'),
 });
 
+export const userGroupsMultiDropdown = makeMultiSelectDropdown({
+  displayName: 'User Groups (replaces all existing groups)',
+  description:
+    'The complete set of back-office groups for the user. Saving replaces the existing groups, so include every group the user should keep.',
+  resourceUri: '/usergroups',
+  fieldsParam: 'id,name',
+  labelFn: attrLabel('name'),
+});
+
 // --- Organizations (multi) ----------------------------------------------------
 
 export const organizationsDropdown = makeSearchableDropdown({
@@ -532,6 +642,15 @@ export const organizationsDropdown = makeSearchableDropdown({
   resourceUri: '/organizations',
   fieldsParam: 'id,name',
   searchExpr: (q) => `name ~ "${q}"`,
+  labelFn: attrLabel('name'),
+});
+
+export const organizationsMultiDropdown = makeMultiSelectDropdown({
+  displayName: 'Organizations (replaces all existing organizations)',
+  description:
+    'The complete set of organizations the user has access to. Saving replaces the existing list, so include every organization the user should keep.',
+  resourceUri: '/organizations',
+  fieldsParam: 'id,name',
   labelFn: attrLabel('name'),
 });
 
@@ -576,15 +695,20 @@ export const customerUserRoleDropdown = makeSearchableDropdown({
   labelFn: attrLabel('label', 'role'),
 });
 
+export const customerUserRolesMultiDropdown = makeMultiSelectDropdown({
+  displayName: 'Roles (replaces all existing roles)',
+  description:
+    'The complete set of customer user roles. Saving replaces the existing roles, so include every role the customer user should keep.',
+  resourceUri: '/customeruserroles',
+  fieldsParam: 'id,label,role',
+  labelFn: attrLabel('label', 'role'),
+});
+
 // --- Additional Attributes / Relations (custom entity fields) -----------------
 
 export const additionalAttributesProp = Property.Json({
   displayName: 'Additional Attributes',
-  description:
-    'Optional JSON object with custom entity attributes. ' +
-    'Keys are attribute names, values are their values. ' +
-    'Example: {"myCustomField": "value", "priority": 5}. ' +
-    'These are merged into the request body after the standard fields.',
+  description: 'Custom fields, merged after the standard ones. Example: {"myField": "value"}',
   required: false,
   defaultValue: {},
 });
@@ -592,21 +716,14 @@ export const additionalAttributesProp = Property.Json({
 export const additionalRelationsProp = Property.Json({
   displayName: 'Additional Relations',
   description:
-    'Optional JSON object with custom entity relationships. ' +
-    'Each key is a relationship name and the value must follow JSON:API linkage format. ' +
-    'Example: {"myRelation": {"data": {"type": "myentities", "id": "1"}}, ' +
-    '"myMultiRelation": {"data": [{"type": "otherentities", "id": "2"}]}}. ' +
-    'These are merged into the request body after the standard relationships.',
+    'Custom relationships in linkage format. Example: {"myRelation": {"data": {"type": "myentities", "id": "1"}}}',
   required: false,
   defaultValue: {},
 });
 
 export const additionalHeadersProp = Property.Object({
   displayName: 'Additional Headers',
-  description:
-    'Optional HTTP headers to send with this request. ' +
-    'These override or extend the default headers configured on the connection. ' +
-    'Example: {"X-Include": "noHateoas;totalCount"}.',
+  description: 'Headers for this step; override the connection defaults. Example: {"X-Include": "totalCount"}',
   required: false,
   defaultValue: {},
 });
@@ -640,6 +757,11 @@ function buildProductNameMap(
 
 type LabelFn = (item: OroJsonApiItem) => string;
 
+type CollectionPages = {
+  items: OroJsonApiItem[];
+  complete: boolean;
+};
+
 type SearchableDropdownConfig = {
   displayName: string;
   description: string;
@@ -651,6 +773,8 @@ type SearchableDropdownConfig = {
   labelFn: LabelFn;
   extraParams?: Record<string, string>;
 };
+
+type MultiSelectDropdownConfig = Omit<SearchableDropdownConfig, 'searchExpr'>;
 
 type EnumDropdownConfig = {
   displayName: string;

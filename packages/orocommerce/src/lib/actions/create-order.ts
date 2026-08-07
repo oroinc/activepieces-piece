@@ -3,6 +3,8 @@ import { HttpMethod } from '@activepieces/pieces-common';
 import {
   oroAuth,
   oroApiCall,
+  attrLabel,
+  loadDropdownOptions,
   customerRequiredDropdown,
   customerUserDropdown,
   organizationDropdown,
@@ -17,12 +19,12 @@ import {
   buildRegionDropdown,
   productDropdown,
   buildIncludedAddress,
+  type AddressRow,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
 } from '../common';
-import { OroAuth } from '../common/types';
-import { jsonApiBodyUtils } from '../common/jsonapi-body-utils';
+import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createOrderAction = createAction({
   auth: oroAuth,
@@ -30,8 +32,8 @@ export const createOrderAction = createAction({
   displayName: 'Create Order',
   description: 'Creates a new order record in OroCommerce.',
   props: {
-    // -- Required relationships ------------------------------------------------
     customer: customerRequiredDropdown,
+    customerUser: customerUserDropdown(false),
 
     // -- Optional attributes ---------------------------------------------------
     currency: Property.ShortText({
@@ -67,12 +69,14 @@ export const createOrderAction = createAction({
     }),
     estimatedShippingCostAmount: Property.Number({
       displayName: 'Estimated Shipping Cost',
-      description: 'Shipping cost calculated from the selected shipping method.',
+      description:
+        'Shipping cost calculated from the selected shipping method.',
       required: false,
     }),
     shippingMethod: Property.ShortText({
       displayName: 'Shipping Method',
-      description: 'The shipping method selected for the order (e.g. "flat_rate_2").',
+      description:
+        'The shipping method selected for the order (e.g. "flat_rate_2").',
       required: false,
     }),
     shippingMethodType: Property.ShortText({
@@ -87,7 +91,6 @@ export const createOrderAction = createAction({
     }),
 
     // -- Optional relationships ------------------------------------------------
-    customerUser: customerUserDropdown(false),
     organization: organizationDropdown,
     owner: userDropdown,
     website: websiteDropdown,
@@ -135,7 +138,10 @@ export const createOrderAction = createAction({
       displayName: 'Billing: Postal Code',
       required: false,
     }),
-    billingAddressCountry: buildCountryDropdown({ required: false, displayName: 'Billing: Country' }),
+    billingAddressCountry: buildCountryDropdown({
+      required: false,
+      displayName: 'Billing: Country',
+    }),
     billingAddressRegion: buildRegionDropdown({
       countryRefresher: 'billingAddressCountry',
       required: false,
@@ -185,7 +191,10 @@ export const createOrderAction = createAction({
       displayName: 'Shipping: Postal Code',
       required: false,
     }),
-    shippingAddressCountry: buildCountryDropdown({ required: false, displayName: 'Shipping: Country' }),
+    shippingAddressCountry: buildCountryDropdown({
+      required: false,
+      displayName: 'Shipping: Country',
+    }),
     shippingAddressRegion: buildRegionDropdown({
       countryRefresher: 'shippingAddressCountry',
       required: false,
@@ -197,9 +206,6 @@ export const createOrderAction = createAction({
       required: false,
     }),
 
-    // -- Line Items ------------------------------------------------------------
-    // DynamicProperties lets us load product units once as StaticDropdown.
-    // Products are entered as SKU/ID text (framework does not support Dropdown inside Array).
     lineItems: Property.DynamicProperties({
       auth: oroAuth,
       displayName: 'Line Items',
@@ -207,51 +213,21 @@ export const createOrderAction = createAction({
       required: true,
       refreshers: [],
       props: async ({ auth }) => {
-        type JsonApiCollection = {
-          data: { id: string; attributes: Record<string, unknown> }[];
-        };
-
-        const unitOptions: { label: string; value: string }[] = [];
-        const warehouseOptions: { label: string; value: string }[] = [];
-
-        if (auth) {
-          try {
-            const unitsResp = await oroApiCall({
-              method: HttpMethod.GET,
-              resourceUri: '/productunits',
-              auth: auth as OroAuth,
-              queryParams: { 'page[size]': '100' },
-            });
-            for (const item of (unitsResp.body as JsonApiCollection).data ?? []) {
-              unitOptions.push({
-                label: String(item.attributes['label'] || item.id),
-                value: item.id,
-              });
-            }
-          } catch {
-            // Silently degrade so the form renders even if the catalog API is unavailable
-          }
-
-          try {
-            const warehousesResp = await oroApiCall({
-              method: HttpMethod.GET,
-              resourceUri: '/warehouses',
-              auth: auth as OroAuth,
-              queryParams: {
-                'page[size]': '100',
-                'fields[warehouses]': 'id,name',
-              },
-            });
-            for (const item of (warehousesResp.body as JsonApiCollection).data ?? []) {
-              warehouseOptions.push({
-                label: String(item.attributes['name'] || item.id),
-                value: item.id,
-              });
-            }
-          } catch {
-            // Silently degrade so the form renders even if the catalog API is unavailable
-          }
-        }
+        const [unitState, warehouseState] = await Promise.all([
+          loadDropdownOptions({
+            auth,
+            resourceUri: '/productunits',
+            labelFn: attrLabel('label'),
+            exhaustive: true,
+          }),
+          loadDropdownOptions({
+            auth,
+            resourceUri: '/warehouses',
+            labelFn: attrLabel('name'),
+            fieldsParam: 'id,name',
+            exhaustive: true,
+          }),
+        ]);
 
         return {
           lineItems: Property.Array({
@@ -288,7 +264,7 @@ export const createOrderAction = createAction({
                 displayName: 'Product Unit',
                 description: 'Unit of measurement (e.g. piece, kg, set).',
                 required: true,
-                options: { disabled: false, options: unitOptions },
+                options: unitState,
               }),
               quantity: Property.Number({
                 displayName: 'Quantity',
@@ -344,7 +320,7 @@ export const createOrderAction = createAction({
                 displayName: 'Warehouse',
                 description: 'Warehouse this line item ships from.',
                 required: false,
-                options: { disabled: false, options: warehouseOptions },
+                options: warehouseState,
               }),
             },
           }),
@@ -402,14 +378,22 @@ export const createOrderAction = createAction({
     // -- Line items ----------------------------------------------------------
     // DynamicProperties wraps the array in an object keyed by "lineItems"
     const dynamicValue = (p.lineItems ?? {}) as Record<string, unknown>;
-    const rawItems = (dynamicValue['lineItems'] ?? []) as Array<Record<string, unknown>>;
+    const rawItems = (dynamicValue['lineItems'] ?? []) as Array<
+      Record<string, unknown>
+    >;
 
-    const lineItems = rawItems.map((item, index) => buildOrderLineItem({ item, index, orderCurrency: p.currency }));
+    const lineItems = rawItems.map((item, index) =>
+      buildOrderLineItem({ item, index, orderCurrency: p.currency })
+    );
     const lineItemResources = lineItems.map((li) => li.resource);
     const lineItemsRelData = lineItems.map((li) => li.ref);
 
-    const extraAttrs = jsonApiBodyUtils.parseAdditionalAttributes(p.additionalAttributes);
-    const extraRels = jsonApiBodyUtils.parseAdditionalRelations(p.additionalRelations);
+    const extraAttrs = jsonApiBodyUtils.parseAdditionalAttributes(
+      p.additionalAttributes
+    );
+    const extraRels = jsonApiBodyUtils.parseAdditionalRelations(
+      p.additionalRelations
+    );
 
     // -- Order attributes ----------------------------------------------------
     const attributes: Record<string, unknown> = {
@@ -432,10 +416,18 @@ export const createOrderAction = createAction({
     const relationships: Record<string, unknown> = {
       lineItems: { data: lineItemsRelData },
       ...(billingAddressResource
-        ? { billingAddress: { data: { type: 'orderaddresses', id: 'billing_address' } } }
+        ? {
+            billingAddress: {
+              data: { type: 'orderaddresses', id: 'billing_address' },
+            },
+          }
         : {}),
       ...(shippingAddressResource
-        ? { shippingAddress: { data: { type: 'orderaddresses', id: 'shipping_address' } } }
+        ? {
+            shippingAddress: {
+              data: { type: 'orderaddresses', id: 'shipping_address' },
+            },
+          }
         : {}),
       ...jsonApiBodyUtils.buildRels({
         customer: ['customers', p.customer],
@@ -466,7 +458,7 @@ export const createOrderAction = createAction({
         data: {
           type: 'orders',
           attributes,
-          relationships
+          relationships,
         },
         included,
       },
@@ -482,33 +474,28 @@ function buildAddressResource({
   fields,
 }: {
   localId: string;
-  fields: {
-    label?: string | null;
-    namePrefix?: string | null;
-    firstName?: string | null;
-    middleName?: string | null;
-    lastName?: string | null;
-    nameSuffix?: string | null;
-    organization?: string | null;
-    phone?: string | null;
-    street?: string | null;
-    street2?: string | null;
-    city?: string | null;
-    postalCode?: string | null;
-    country?: string | null;
-    region?: string | null;
-    customRegion?: string | null;
-  };
+  fields: AddressRow;
 }): Record<string, unknown> | null {
-  const hasData = Object.values(fields).some((v) => v != null && v !== '');
-  if (!hasData) return null;
-
   return buildIncludedAddress({
     lid: localId,
     type: 'orderaddresses',
-    addr: fields as Record<string, unknown>,
+    addr: fields,
     extraAttributes: { fromExternalSource: false },
   });
+}
+
+function toOrderLineItemRow(item: Record<string, unknown>): OrderLineItemRow {
+  const row: OrderLineItemRow = {};
+  for (const field of LINE_ITEM_TEXT_FIELDS) {
+    const value = item[field];
+    if (typeof value === 'string') row[field] = value;
+  }
+  for (const field of LINE_ITEM_NUMBER_FIELDS) {
+    const value = item[field];
+    if (typeof value === 'number') row[field] = value;
+    else if (typeof value === 'string') row[field] = Number(value);
+  }
+  return row;
 }
 
 function buildOrderLineItem({
@@ -521,52 +508,67 @@ function buildOrderLineItem({
   orderCurrency: string | null | undefined;
 }): { resource: Record<string, unknown>; ref: { type: string; id: string } } {
   const lid = `li_${index + 1}`;
-  const productUnitId = item['productUnit'] as string | undefined;
+  const row = toOrderLineItemRow(item);
 
   const attributes: Record<string, unknown> = {
     fromExternalSource: true,
-    productSku: String(item['productSku'] ?? ''),
-    quantity: Number(item['quantity']),
-    value: Number(item['value']),
-    currency:
-      (item['currency'] as string | undefined) || orderCurrency || 'USD',
-    priceType: item['priceType'] != null ? Number(item['priceType']) : 10,
+    productSku: row.productSku ?? '',
+    quantity: Number(row.quantity),
+    value: Number(row.value),
+    currency: row.currency || orderCurrency || 'USD',
+    priceType: row.priceType ?? 10,
 
     ...jsonApiBodyUtils.pickDefined({
-      productName: item['productName'] as string | undefined,
-      freeFormProduct: item['freeFormProduct'] as string | undefined,
-      comment: item['comment'] as string | undefined,
-      shipBy: item['shipBy'] as string | undefined,
+      productName: row.productName,
+      freeFormProduct: row.freeFormProduct,
+      comment: row.comment,
+      shipBy: row.shipBy,
     }),
 
-    ...(item['shippingEstimateAmount'] != null
-      ? { shippingEstimateAmount: Number(item['shippingEstimateAmount']) }
+    ...(row.shippingEstimateAmount != null
+      ? { shippingEstimateAmount: row.shippingEstimateAmount }
       : {}),
 
-    ...(item['shippingMethod']
-      ? { shippingMethod: item['shippingMethod'] }
-      : {}),
+    ...(row.shippingMethod ? { shippingMethod: row.shippingMethod } : {}),
 
-    ...(item['shippingMethodType']
-      ? { shippingMethodType: item['shippingMethodType'] }
+    ...(row.shippingMethodType
+      ? { shippingMethodType: row.shippingMethodType }
       : {}),
   };
 
-  const productId = (item['productId'] as string | undefined)?.trim();
-  const liWarehouseId =
-    (item['warehouseId'] as string | undefined)?.trim() ||
-    (item['warehouse'] as string | undefined)?.trim();
-
-  const relationships: Record<string, unknown> = {
-    productUnit: { data: { type: 'productunits', id: String(productUnitId) } },
-    ...jsonApiBodyUtils.buildRels({
-      product: ['products', productId],
-      warehouse: ['warehouses', liWarehouseId],
-    }),
-  };
+  const relationships: Record<string, unknown> = jsonApiBodyUtils.buildRels({
+    productUnit: ['productunits', row.productUnit],
+    product: ['products', row.productId?.trim()],
+    warehouse: ['warehouses', row.warehouseId?.trim() || row.warehouse?.trim()],
+  });
 
   return {
     resource: { type: 'orderlineitems', id: lid, attributes, relationships },
     ref: { type: 'orderlineitems', id: lid },
   };
 }
+
+const LINE_ITEM_TEXT_FIELDS = [
+  'productId',
+  'productName',
+  'freeFormProduct',
+  'productSku',
+  'productUnit',
+  'currency',
+  'comment',
+  'shipBy',
+  'shippingMethod',
+  'shippingMethodType',
+  'warehouse',
+  'warehouseId',
+] as const;
+
+const LINE_ITEM_NUMBER_FIELDS = [
+  'quantity',
+  'value',
+  'priceType',
+  'shippingEstimateAmount',
+] as const;
+
+type OrderLineItemRow = Partial<Record<(typeof LINE_ITEM_TEXT_FIELDS)[number], string>> &
+  Partial<Record<(typeof LINE_ITEM_NUMBER_FIELDS)[number], number>>;

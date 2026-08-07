@@ -1,5 +1,3 @@
-// -- JSON:API wire types ----------------------------------------------------
-
 export type Linkage = { type: string; id: string };
 
 export interface JsonApiResource {
@@ -14,7 +12,10 @@ export interface JsonApiDocument {
   included?: JsonApiResource[];
 }
 
-// -- Simplified / flat output types ----------------------------------------
+export interface JsonApiResourceDocument {
+  data: JsonApiResource;
+  included?: JsonApiResource[];
+}
 
 /**
  * A plain object produced by deserializing a JSON:API resource.

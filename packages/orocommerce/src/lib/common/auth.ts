@@ -45,8 +45,9 @@ Authenticate to OroCommerce APIs using OAuth 2.0 Client Credentials.
     headers: Property.LongText({
       displayName: 'Default HTTP Headers',
       description:
-        'JSON object of HTTP headers sent with every API request. ' +
-        'Actions can override or extend these per-call. ' +
+        'JSON object of HTTP headers sent with every action of this piece, including Custom API Call. ' +
+        'A header set on the step itself wins over the same header set here. ' +
+        'Authorization is always managed by this connection and cannot be overridden per step. ' +
         'Example: {"Content-Type": "application/vnd.api+json", "X-Custom": "value"}',
       required: false
     }),
