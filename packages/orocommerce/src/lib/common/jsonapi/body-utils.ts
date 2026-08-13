@@ -81,4 +81,23 @@ function parseAdditionalRelations(
   return obj;
 }
 
-export const jsonApiBodyUtils = { pickDefined, omitEmptyObjects, buildRels, parseAdditionalAttributes, parseAdditionalRelations };
+function assertUpdateNotEmpty({
+  attributes,
+  relationships,
+  actionName,
+}: {
+  attributes: Record<string, unknown>;
+  relationships: Record<string, unknown>;
+  actionName: string;
+}): void {
+  if (
+    Object.keys(attributes).length === 0 &&
+    Object.keys(relationships).length === 0
+  ) {
+    throw new Error(
+      `${actionName}: nothing to update. Fill in at least one field or relationship.`
+    );
+  }
+}
+
+export const jsonApiBodyUtils = { pickDefined, omitEmptyObjects, buildRels, parseAdditionalAttributes, parseAdditionalRelations, assertUpdateNotEmpty };

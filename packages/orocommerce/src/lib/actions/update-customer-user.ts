@@ -131,6 +131,12 @@ export const updateCustomerUserAction = createAction({
       ...extraRels,
     };
 
+    jsonApiBodyUtils.assertUpdateNotEmpty({
+      attributes,
+      relationships,
+      actionName: 'Update Customer User',
+    });
+
     const response = await oroApiCall({
       method: HttpMethod.PATCH,
       resourceUri: `/customerusers/${p.customerUserId}`,
