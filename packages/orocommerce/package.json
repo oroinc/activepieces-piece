@@ -13,7 +13,9 @@
     "build": "tsc -p tsconfig.lib.json && cp package.json dist/",
     "lint": "eslint 'src/**/*.ts' 'test/**/*.ts'",
     "bundle": "node ../../../../dist/packages/cli/src/index.js pieces bundle",
-    "test": "vitest run"
+    "test": "vitest run",
+    "i18n:check": "node tools/check-i18n.mjs",
+    "i18n:write": "node tools/check-i18n.mjs --write"
   },
   "devDependencies": {
     "vitest": "3.2.6",
