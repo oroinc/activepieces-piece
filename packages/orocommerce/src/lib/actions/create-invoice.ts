@@ -12,6 +12,7 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  lineItemUtils,
 } from '../common';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
@@ -189,27 +190,83 @@ export const createInvoiceAction = createAction({
   async run(context) {
     const p = context.propsValue;
 
-    const dynamicValue = (p.lineItems ?? {}) as Record<string, unknown>;
-    const rawItems = (dynamicValue['lineItems'] ?? []) as Array<
-      Record<string, unknown>
-    >;
+    const rows = lineItemUtils.readRows({
+      value: p.lineItems,
+      arrayKey: 'lineItems',
+      displayName: LINE_ITEMS_DISPLAY_NAME,
+    });
 
-    const lineItemResources = rawItems.map((item, index) => ({
+    const lineItemResources = rows.map((row, index) => ({
       type: 'invoicelineitems',
       id: `li_${index + 1}`,
       attributes: {
         position: index + 1,
-        lineNumber: item['lineNumber'] || String(index + 1),
-        description: item['description'],
-        quantity: Number(item['quantity']),
-        unitOfQuantity: item['unitOfQuantity'],
-        unitPrice: Number(item['unitPrice']),
-        rowTotal: Number(item['rowTotal']),
+        lineNumber:
+          lineItemUtils.optionalString({
+            row,
+            index,
+            field: 'lineNumber',
+            label: 'Line Number',
+            displayName: LINE_ITEMS_DISPLAY_NAME,
+          }) ?? String(index + 1),
+        description: lineItemUtils.requiredString({
+          row,
+          index,
+          field: 'description',
+          label: 'Description',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+        }),
+        quantity: lineItemUtils.requiredNumber({
+          row,
+          index,
+          field: 'quantity',
+          label: 'Quantity',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+          min: 0,
+        }),
+        unitPrice: lineItemUtils.requiredNumber({
+          row,
+          index,
+          field: 'unitPrice',
+          label: 'Unit Price',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+          min: 0,
+        }),
+        rowTotal: lineItemUtils.requiredNumber({
+          row,
+          index,
+          field: 'rowTotal',
+          label: 'Row Total',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+        }),
         ...jsonApiBodyUtils.pickDefined({
-          note: item['note'] as string | undefined,
+          unitOfQuantity: lineItemUtils.optionalString({
+            row,
+            index,
+            field: 'unitOfQuantity',
+            label: 'Product Unit',
+            displayName: LINE_ITEMS_DISPLAY_NAME,
+          }),
+          note: lineItemUtils.optionalString({
+            row,
+            index,
+            field: 'note',
+            label: 'Note',
+            displayName: LINE_ITEMS_DISPLAY_NAME,
+          }),
         }),
       },
     }));
+
+    lineItemUtils.assertSumMatches({
+      rows,
+      field: 'rowTotal',
+      label: 'Row Total',
+      displayName: LINE_ITEMS_DISPLAY_NAME,
+      total: p.totalAmount,
+      totalLabel: 'Total Amount',
+      toleranceMinorUnits: 1,
+    });
 
     const lineItemsRelData = lineItemResources.map((li) => ({
       type: 'invoicelineitems',
@@ -289,3 +346,5 @@ export const createInvoiceAction = createAction({
     return response.body;
   },
 });
+
+const LINE_ITEMS_DISPLAY_NAME = 'Line Items';

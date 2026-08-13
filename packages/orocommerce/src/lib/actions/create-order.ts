@@ -23,6 +23,7 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  lineItemUtils,
 } from '../common';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
@@ -377,13 +378,14 @@ export const createOrderAction = createAction({
 
     // -- Line items ----------------------------------------------------------
     // DynamicProperties wraps the array in an object keyed by "lineItems"
-    const dynamicValue = (p.lineItems ?? {}) as Record<string, unknown>;
-    const rawItems = (dynamicValue['lineItems'] ?? []) as Array<
-      Record<string, unknown>
-    >;
+    const rows = lineItemUtils.readRows({
+      value: p.lineItems,
+      arrayKey: 'lineItems',
+      displayName: LINE_ITEMS_DISPLAY_NAME,
+    });
 
-    const lineItems = rawItems.map((item, index) =>
-      buildOrderLineItem({ item, index, orderCurrency: p.currency })
+    const lineItems = rows.map((row, index) =>
+      buildOrderLineItem({ row, index, orderCurrency: p.currency })
     );
     const lineItemResources = lineItems.map((li) => li.resource);
     const lineItemsRelData = lineItems.map((li) => li.ref);
@@ -484,62 +486,155 @@ function buildAddressResource({
   });
 }
 
-function toOrderLineItemRow(item: Record<string, unknown>): OrderLineItemRow {
-  const row: OrderLineItemRow = {};
-  for (const field of LINE_ITEM_TEXT_FIELDS) {
-    const value = item[field];
-    if (typeof value === 'string') row[field] = value;
-  }
-  for (const field of LINE_ITEM_NUMBER_FIELDS) {
-    const value = item[field];
-    if (typeof value === 'number') row[field] = value;
-    else if (typeof value === 'string') row[field] = Number(value);
-  }
-  return row;
+function orderText({ row, index, field, label }: OrderFieldParams): string | undefined {
+  return lineItemUtils.optionalString({
+    row,
+    index,
+    field,
+    label,
+    displayName: LINE_ITEMS_DISPLAY_NAME,
+  });
+}
+
+function orderRequiredText({ row, index, field, label }: OrderFieldParams): string {
+  return lineItemUtils.requiredString({
+    row,
+    index,
+    field,
+    label,
+    displayName: LINE_ITEMS_DISPLAY_NAME,
+  });
+}
+
+function orderNumber({
+  row,
+  index,
+  field,
+  label,
+  min,
+}: OrderFieldParams & { min?: number }): number | undefined {
+  return lineItemUtils.optionalNumber({
+    row,
+    index,
+    field,
+    label,
+    displayName: LINE_ITEMS_DISPLAY_NAME,
+    min,
+  });
+}
+
+function orderRequiredNumber({
+  row,
+  index,
+  field,
+  label,
+  min,
+}: OrderFieldParams & { min?: number }): number {
+  return lineItemUtils.requiredNumber({
+    row,
+    index,
+    field,
+    label,
+    displayName: LINE_ITEMS_DISPLAY_NAME,
+    min,
+  });
 }
 
 function buildOrderLineItem({
-  item,
+  row,
   index,
   orderCurrency,
 }: {
-  item: Record<string, unknown>;
+  row: Record<string, unknown>;
   index: number;
   orderCurrency: string | null | undefined;
 }): { resource: Record<string, unknown>; ref: { type: string; id: string } } {
   const lid = `li_${index + 1}`;
-  const row = toOrderLineItemRow(item);
 
   const attributes: Record<string, unknown> = {
     fromExternalSource: true,
-    productSku: row.productSku ?? '',
-    quantity: Number(row.quantity),
-    value: Number(row.value),
-    currency: row.currency || orderCurrency || 'USD',
-    priceType: row.priceType ?? 10,
+    productSku: orderRequiredText({
+      row,
+      index,
+      field: 'productSku',
+      label: 'Product SKU',
+    }),
+    quantity: orderRequiredNumber({
+      row,
+      index,
+      field: 'quantity',
+      label: 'Quantity',
+      min: 0,
+    }),
+    value: orderRequiredNumber({
+      row,
+      index,
+      field: 'value',
+      label: 'Unit Price',
+      min: 0,
+    }),
+    currency:
+      orderText({ row, index, field: 'currency', label: 'Currency' }) ||
+      orderCurrency ||
+      'USD',
+    priceType:
+      orderNumber({ row, index, field: 'priceType', label: 'Price Type' }) ?? 10,
 
     ...jsonApiBodyUtils.pickDefined({
-      productName: row.productName,
-      freeFormProduct: row.freeFormProduct,
-      comment: row.comment,
-      shipBy: row.shipBy,
+      productName: orderText({
+        row,
+        index,
+        field: 'productName',
+        label: 'Product Name',
+      }),
+      freeFormProduct: orderText({
+        row,
+        index,
+        field: 'freeFormProduct',
+        label: 'Free-Form Product',
+      }),
+      comment: orderText({ row, index, field: 'comment', label: 'Comment' }),
+      shipBy: orderText({ row, index, field: 'shipBy', label: 'Ship By Date' }),
+      shippingEstimateAmount: orderNumber({
+        row,
+        index,
+        field: 'shippingEstimateAmount',
+        label: 'Shipping Estimate Amount',
+      }),
+      shippingMethod: orderText({
+        row,
+        index,
+        field: 'shippingMethod',
+        label: 'Shipping Method',
+      }),
+      shippingMethodType: orderText({
+        row,
+        index,
+        field: 'shippingMethodType',
+        label: 'Shipping Method Type',
+      }),
     }),
-
-    ...(row.shippingEstimateAmount != null
-      ? { shippingEstimateAmount: row.shippingEstimateAmount }
-      : {}),
-
-    ...(row.shippingMethod ? { shippingMethod: row.shippingMethod } : {}),
-
-    ...(row.shippingMethodType
-      ? { shippingMethodType: row.shippingMethodType }
-      : {}),
   };
 
   const relationships: Record<string, unknown> = jsonApiBodyUtils.buildRels({
-    productUnit: ['productunits', row.productUnit],
-    product: ['products', row.productId?.trim()],
-    warehouse: ['warehouses', row.warehouseId?.trim() || row.warehouse?.trim()],
+    productUnit: [
+      'productunits',
+      orderRequiredText({
+        row,
+        index,
+        field: 'productUnit',
+        label: 'Product Unit',
+      }),
+    ],
+    product: [
+      'products',
+      orderText({ row, index, field: 'productId', label: 'Product: Raw ID' }),
+    ],
+    warehouse: [
+      'warehouses',
+      orderText({ row, index, field: 'warehouseId', label: 'Warehouse' }) ??
+        orderText({ row, index, field: 'warehouse', label: 'Warehouse' }),
+    ],
   });
 
   return {
@@ -548,27 +643,11 @@ function buildOrderLineItem({
   };
 }
 
-const LINE_ITEM_TEXT_FIELDS = [
-  'productId',
-  'productName',
-  'freeFormProduct',
-  'productSku',
-  'productUnit',
-  'currency',
-  'comment',
-  'shipBy',
-  'shippingMethod',
-  'shippingMethodType',
-  'warehouse',
-  'warehouseId',
-] as const;
+const LINE_ITEMS_DISPLAY_NAME = 'Line Items';
 
-const LINE_ITEM_NUMBER_FIELDS = [
-  'quantity',
-  'value',
-  'priceType',
-  'shippingEstimateAmount',
-] as const;
-
-type OrderLineItemRow = Partial<Record<(typeof LINE_ITEM_TEXT_FIELDS)[number], string>> &
-  Partial<Record<(typeof LINE_ITEM_NUMBER_FIELDS)[number], number>>;
+type OrderFieldParams = {
+  row: Record<string, unknown>;
+  index: number;
+  field: string;
+  label: string;
+};
