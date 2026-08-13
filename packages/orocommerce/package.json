@@ -1,6 +1,22 @@
 {
   "name": "@activepieces/piece-orocommerce",
   "version": "0.2.0",
+  "description": "Activepieces piece for the OroCommerce back-office JSON:API: create and update customers, customer users, back-office users, orders and invoices, and trigger flows from OroCommerce webhooks.",
+  "keywords": [
+    "activepieces",
+    "orocommerce",
+    "orocrm",
+    "b2b",
+    "ecommerce",
+    "json-api"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/oroinc/activepieces/tree/main/packages/pieces/community/orocommerce#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oroinc/activepieces.git",
+    "directory": "packages/pieces/community/orocommerce"
+  },
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "dependencies": {
