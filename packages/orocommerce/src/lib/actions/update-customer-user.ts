@@ -37,7 +37,8 @@ export const updateCustomerUserAction = createAction({
     }),
     password: Property.ShortText({
       displayName: 'Password',
-      description: 'New password for the account. Must comply with the system security policy.',
+      description:
+        'New password for the account. Must comply with the system security policy. Stored in clear text in this step and visible to anyone who can open the flow, so prefer a value carried in from a secret store over a literal one.',
       required: false,
     }),
 
