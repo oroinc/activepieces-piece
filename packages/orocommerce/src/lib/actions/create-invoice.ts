@@ -41,13 +41,13 @@ export const createInvoiceAction = createAction({
     }),
     customer: customerDropdown,
     customerUser: customerUserDropdown(false),
-    refCustomerId: Property.Number({
+    refCustomerId: Property.ShortText({
       displayName: 'External Customer ID',
       description:
         'An optional ID reference to a customer. Can be used for storing an arbitrary external ID.',
       required: false,
     }),
-    refCustomerUserId: Property.Number({
+    refCustomerUserId: Property.ShortText({
       displayName: 'External Customer User ID',
       description:
         'An optional ID reference to a customer user. Can be used for storing an arbitrary external ID.',
@@ -107,17 +107,17 @@ export const createInvoiceAction = createAction({
       description: 'URL for the external payment page.',
       required: false,
     }),
-    invoicePdfContent: Property.LongText({
-      displayName: 'Invoice PDF (Base64)',
+    invoicePdfContent: Property.File({
+      displayName: 'Invoice PDF',
       description:
-        'Base64-encoded PDF file content. When provided, the file is attached to the invoice as the default PDF.',
+        'PDF file to attach to the invoice as the default PDF. Accepts a file from a previous step or a URL.',
       required: false,
     }),
     invoicePdfFilename: Property.ShortText({
       displayName: 'Invoice PDF Filename',
-      description: 'Filename for the attached PDF (e.g. invoice.pdf).',
+      description:
+        'Filename for the attached PDF (e.g. invoice.pdf). Defaults to the uploaded file name.',
       required: false,
-      defaultValue: 'invoice.pdf',
     }),
 
     organization: organizationDropdown,
@@ -279,8 +279,9 @@ export const createInvoiceAction = createAction({
           id: 'invoiceDefaultPdfFile',
           attributes: {
             mimeType: 'application/pdf',
-            originalFilename: p.invoicePdfFilename || 'invoice.pdf',
-            content: p.invoicePdfContent,
+            originalFilename:
+              p.invoicePdfFilename || p.invoicePdfContent.filename,
+            content: p.invoicePdfContent.base64,
           },
         }
       : undefined;
