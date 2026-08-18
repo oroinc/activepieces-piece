@@ -60,10 +60,10 @@ tokens or customer data.
 
 ---
 
-The rest of this file is for contributors. The piece follows the repository convention of keeping
-explanatory prose out of the source, so the non-obvious rules live here — read the relevant section
-before changing anything under `src/`. Most of them exist because of a bug that is easy to
-reintroduce.
+The rest of this file is for contributors. The repository bans code comments; this piece keeps
+section markers and a handful of short why-comments anyway, and everything longer lives here — read
+the relevant section before changing anything under `src/`. Most of them exist because of a bug that
+is easy to reintroduce.
 
 ## How it talks to Oro
 
@@ -250,7 +250,9 @@ build is the type-check.
 
 `.github/workflows/ci.yml` runs `test` and `i18n:check` for this piece by name, alongside the other
 packages in its hardcoded filter list. `test/jsonapi-roundtrip.test.ts` guards the
-serialize/deserialize contract above and `test/line-items.test.ts` guards line-item validation.
+serialize/deserialize contract above, `test/line-items.test.ts` guards line-item validation,
+`test/body-utils.test.ts` guards the request-body helpers, and `test/action-guards.test.ts` guards
+the checks that stop an action calling Oro with unusable input.
 
 ## The i18n gate
 
@@ -258,21 +260,27 @@ serialize/deserialize contract above and `test/line-items.test.ts` guards line-i
 translations. Both are generated, not hand-maintained:
 
 ```bash
-npm run cli pieces generate-translation-file orocommerce   # canonical, inside the monorepo
-npm run i18n:write                                         # same thing without the monorepo CLI
+npm run cli pieces generate-translation-file orocommerce            # canonical; writes translation.json only
+npx turbo run i18n:write --filter=@activepieces/piece-orocommerce   # also reconciles the locale files (builds first)
 ```
 
+The two are not interchangeable. The CLI rewrites `translation.json` and nothing else, and it writes
+no trailing newline; `i18n:write` rewrites all six files and does. Prefer `i18n:write` — it is the
+one that keeps the locale files in step with the source.
+
 `npm run i18n:check` (`tools/check-i18n.mjs`) fails the build when they drift. It imports the
-**built** piece from `dist/`, walks the same 19 metadata paths as
+**built** piece from `dist/` and only checks that the file exists, never that it is current — run it
+through turbo (`npx turbo run i18n:check`), which builds first. It walks the same 19 metadata paths as
 `pieceTranslation.pathsToValuesToTranslate` in `packages/pieces/framework/src/lib/i18n.ts`, and
 truncates keys at 512 characters exactly as the official generator does. It fails on keys missing
 from or stale in `translation.json`, on any locale file whose key set differs from it, and on empty
 values. Values identical to the English source are a warning; `--strict-untranslated` promotes them
 to errors.
 
-`npm run i18n:write` regenerates `translation.json` and reconciles every locale file against it —
-stale keys are dropped, missing keys are seeded with the English text, and existing translations are
-left untouched. Seeded keys still need translating.
+`i18n:write` regenerates `translation.json` and reconciles every locale file against it — stale keys
+are dropped, missing keys are seeded with the English text, and existing translations are left
+untouched. Dropped keys are listed, because a key disappears whenever its English source text
+changes and the translation attached to it goes with it. Seeded keys still need translating.
 
 ## Passwords are step inputs, and step inputs are not secrets
 
@@ -328,6 +336,18 @@ client secret always come from the connection.
   iterates `LocalesEnum` (`packages/core/utils/src/lib/locale.ts`), which has no Polish or
   Ukrainian. The gate keeps them in sync so they are ready if those locales are added, and
   `i18n:check` prints a warning for each.
+- **An untouched `Property.Checkbox` arrives as `false`, not `undefined`.** The builder seeds an
+  unset checkbox with `property.defaultValue ?? false`
+  (`packages/web/src/features/pieces/utils/form-utils.tsx`) and persists it into the step input, and
+  `checkboxProcessor` passes `false` through — it is the one property type whose "empty" form value is
+  not normalised to `undefined` the way `textProcessor` and `numberProcessor` normalise theirs. So
+  `p.enabled ?? undefined` is `false`, `pickDefined` keeps it, and `update-user` / `update-customer-user`
+  send `enabled: false` on every call while `assertUpdateNotEmpty` can never fire for them. Fixing it
+  means a three-state prop (a `Property.StaticDropdown` with a "leave unchanged" option, as in
+  `campaign-monitor/src/lib/actions/update-subscriber-details.ts`), which changes the props and so
+  needs an i18n regeneration — do not paper over it with a `defaultValue`, since `true` would
+  unconditionally *enable* instead. Hand-written `propsValue` in `test/action-guards.test.ts` does not
+  reproduce this; a builder-shaped case must include `enabled: false`.
 - Line-item input is validated through `lineItemUtils` (`src/lib/common/line-items.ts`), not bare
   `Number()`. `Number(undefined)` is `NaN` and `JSON.stringify` serialises `NaN` as `null`, so an
   unvalidated missing quantity used to reach Oro as `null` with no error. Route any new line-item

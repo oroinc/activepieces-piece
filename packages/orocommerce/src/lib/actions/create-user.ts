@@ -9,12 +9,12 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
   userRolesMultiDropdown,
   userGroupsMultiDropdown,
   organizationsMultiDropdown,
   businessUnitsMultiDropdown,
 } from '../common';
-import { OroAuth } from '../common/types';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createUserAction = createAction({
@@ -145,7 +145,7 @@ export const createUserAction = createAction({
     const response = await oroApiCall({
       method: HttpMethod.POST,
       resourceUri: '/users',
-      auth: context.auth as OroAuth,
+      auth: context.auth,
       body: {
         data: {
           type: 'users',
@@ -153,7 +153,7 @@ export const createUserAction = createAction({
           relationships,
         },
       },
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;

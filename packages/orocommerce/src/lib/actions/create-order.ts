@@ -23,6 +23,7 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
   lineItemUtils,
 } from '../common';
 import { jsonApiBodyUtils } from '../common/jsonapi';
@@ -464,7 +465,7 @@ export const createOrderAction = createAction({
         },
         included,
       },
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;
@@ -632,8 +633,7 @@ function buildOrderLineItem({
     ],
     warehouse: [
       'warehouses',
-      orderText({ row, index, field: 'warehouseId', label: 'Warehouse' }) ??
-        orderText({ row, index, field: 'warehouse', label: 'Warehouse' }),
+      orderText({ row, index, field: 'warehouse', label: 'Warehouse' }),
     ],
   });
 

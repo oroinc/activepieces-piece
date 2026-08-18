@@ -12,6 +12,7 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
   lineItemUtils,
 } from '../common';
 import { jsonApiBodyUtils } from '../common/jsonapi';
@@ -126,8 +127,6 @@ export const createInvoiceAction = createAction({
     internalStatus: invoiceInternalStatusDropdown,
 
     // -- Line Items ------------------------------------------------------------
-    // DynamicProperties lets us load product units once as StaticDropdown.
-    // Products are entered as SKU/ID text (framework does not support Dropdown inside Array).
     lineItems: Property.DynamicProperties({
       auth: oroAuth,
       displayName: 'Line Items',
@@ -341,7 +340,7 @@ export const createInvoiceAction = createAction({
         },
         included,
       },
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;

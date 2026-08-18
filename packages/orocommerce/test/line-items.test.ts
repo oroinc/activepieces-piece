@@ -42,6 +42,26 @@ describe('lineItemUtils.readRows', () => {
     ).toThrow(/add at least one row/);
   });
 
+  it('reports a value that is not a list as such, not as an empty one', () => {
+    expect(() =>
+      lineItemUtils.readRows({
+        value: { lineItems: 'nope' },
+        arrayKey: 'lineItems',
+        displayName,
+      })
+    ).toThrow('Line Items: expected a list of rows, got "nope".');
+    expect(() =>
+      lineItemUtils.readRows({ value: { lineItems: 5 }, arrayKey: 'lineItems', displayName })
+    ).toThrow('Line Items: expected a list of rows, got 5.');
+    expect(() =>
+      lineItemUtils.readRows({
+        value: { lineItems: { lineItems: [{ quantity: 1 }] } },
+        arrayKey: 'lineItems',
+        displayName,
+      })
+    ).toThrow('Line Items: expected a list of rows, got an object.');
+  });
+
   it('rejects non-object rows and reports a 1-based index', () => {
     expect(() =>
       lineItemUtils.readRows({
@@ -83,6 +103,22 @@ describe('lineItemUtils.requiredNumber', () => {
     expect(() =>
       lineItemUtils.requiredNumber({ ...base, row: { quantity: Number.POSITIVE_INFINITY } })
     ).toThrow(/must be a number/);
+  });
+
+  it('rejects the non-decimal literals Number() would happily parse', () => {
+    for (const value of ['0x10', '0b101', '0o17', '1_000', '1,000', '$5', '5%']) {
+      expect(() =>
+        lineItemUtils.requiredNumber({ ...base, row: { quantity: value } })
+      ).toThrow(`must be a number, got "${value}"`);
+    }
+  });
+
+  it('still accepts the decimal forms a user may reasonably type', () => {
+    expect(lineItemUtils.requiredNumber({ ...base, row: { quantity: '+5' } })).toBe(5);
+    expect(lineItemUtils.requiredNumber({ ...base, row: { quantity: '-5' } })).toBe(-5);
+    expect(lineItemUtils.requiredNumber({ ...base, row: { quantity: '.5' } })).toBe(0.5);
+    expect(lineItemUtils.requiredNumber({ ...base, row: { quantity: '5.' } })).toBe(5);
+    expect(lineItemUtils.requiredNumber({ ...base, row: { quantity: '1e3' } })).toBe(1000);
   });
 
   it('rejects a boolean that Number() would silently turn into 1', () => {
@@ -222,6 +258,20 @@ describe('lineItemUtils.assertSumMatches', () => {
         toleranceMinorUnits: 1,
       })
     ).not.toThrow();
+  });
+
+  it('accepts a half-cent total at zero tolerance, where value * 100 rounds down', () => {
+    for (const [row, total] of [[1.005, 1.01], [0.145, 0.15], [8.165, 8.17]] as const) {
+      expect(() =>
+        lineItemUtils.assertSumMatches({ ...params, rows: [{ rowTotal: row }], total })
+      ).not.toThrow();
+    }
+  });
+
+  it('still rejects a real discrepancy at zero tolerance', () => {
+    expect(() =>
+      lineItemUtils.assertSumMatches({ ...params, rows: [{ rowTotal: 10.005 }], total: 10 })
+    ).toThrow(/"Total Amount" is 10, but the sum of "Row Total"/);
   });
 
   it('rejects a non-numeric total', () => {
