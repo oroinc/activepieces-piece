@@ -13,8 +13,8 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
 } from '../common';
-import { OroAuth } from '../common/types';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const updateCustomerAction = createAction({
@@ -103,7 +103,7 @@ export const updateCustomerAction = createAction({
     const response = await oroApiCall({
       method: HttpMethod.PATCH,
       resourceUri: `/customers/${p.customerId}`,
-      auth: context.auth as OroAuth,
+      auth: context.auth,
       body: {
         data: {
           type: 'customers',
@@ -112,7 +112,7 @@ export const updateCustomerAction = createAction({
           relationships,
         },
       },
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;

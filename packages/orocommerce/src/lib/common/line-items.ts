@@ -33,7 +33,7 @@ function describeValue(value: unknown): string {
 }
 
 function toMinorUnits(value: number): number {
-  return Math.round(value * 100);
+  return Math.round(Number((value * 100).toFixed(4)));
 }
 
 function parseNumber(value: unknown): number | undefined {
@@ -42,7 +42,7 @@ function parseNumber(value: unknown): number | undefined {
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    if (trimmed === '') return undefined;
+    if (!DECIMAL_NUMBER.test(trimmed)) return undefined;
     const parsed = Number(trimmed);
     return Number.isFinite(parsed) ? parsed : undefined;
   }
@@ -58,6 +58,11 @@ function readRows({
   const raw =
     container?.[arrayKey] ?? (Array.isArray(value) ? value : undefined);
 
+  if (raw !== undefined && raw !== null && !Array.isArray(raw)) {
+    throw new Error(
+      `${displayName}: expected a list of rows, got ${describeValue(raw)}.`
+    );
+  }
   if (!Array.isArray(raw) || raw.length === 0) {
     throw new Error(
       `${displayName}: add at least one row before running this step.`
@@ -201,6 +206,8 @@ export const lineItemUtils = {
   optionalString,
   assertSumMatches,
 };
+
+const DECIMAL_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
 export type LineItemRow = Record<string, unknown>;
 

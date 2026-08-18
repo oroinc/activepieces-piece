@@ -15,8 +15,8 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
 } from '../common';
-import { OroAuth } from '../common/types';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createCustomerUserAction = createAction({
@@ -181,9 +181,9 @@ export const createCustomerUserAction = createAction({
     const response = await oroApiCall({
       method: HttpMethod.POST,
       resourceUri: '/customerusers',
-      auth: context.auth as OroAuth,
+      auth: context.auth,
       body,
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;

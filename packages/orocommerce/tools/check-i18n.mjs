@@ -102,7 +102,12 @@ async function loadPiece({ modulePath }) {
 
 async function readJson({ filePath }) {
   const content = await readFile(filePath, 'utf8');
-  const parsed = JSON.parse(content);
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error) {
+    throw new Error(`${filePath} is not valid JSON: ${error.message}`);
+  }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error(`${filePath} must contain a JSON object.`);
   }
@@ -195,9 +200,12 @@ async function run() {
         reconciled[key] = existing[key] ?? expected[key];
       }
       await writeJson({ filePath: localePath, value: reconciled });
-      const added = difference({ from: expectedKeys, without: new Set(Object.keys(existing)) }).length;
-      const removed = difference({ from: new Set(Object.keys(existing)), without: expectedKeys }).length;
-      console.log(`reconciled src/i18n/${file}: +${added} seeded, -${removed} stale`);
+      const added = difference({ from: expectedKeys, without: new Set(Object.keys(existing)) });
+      const removed = difference({ from: new Set(Object.keys(existing)), without: expectedKeys });
+      console.log(`reconciled src/i18n/${file}: +${added.length} seeded, -${removed.length} stale`);
+      if (removed.length > 0) {
+        console.log(`  ${reportList({ label: 'Dropped, translation lost', keys: removed })}`);
+      }
       continue;
     }
 
