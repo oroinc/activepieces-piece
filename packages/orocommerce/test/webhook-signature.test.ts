@@ -209,6 +209,24 @@ describe('the webhook trigger verifies signed deliveries', () => {
     expect(result).toStrictEqual([]);
   });
 
+  it('still discards cleanly on an engine that predates flows/step in the context', async () => {
+    const store = createStore({ webhookId: 'wh-1', topic: TOPIC, secret: SECRET });
+    const legacyEngineContext = {
+      store,
+      payload: {
+        body: BODY,
+        rawBody: RAW_BODY,
+        headers: {},
+        queryParams: {},
+      },
+      propsValue: { topic: TOPIC, signDeliveries: true },
+    } as unknown as RunContext;
+
+    const result = await oroWebhookTopicTrigger.run(legacyEngineContext);
+
+    expect(result).toStrictEqual([]);
+  });
+
   it('verifies the bytes Oro sent, not a re-serialized body', async () => {
     const store = createStore({ webhookId: 'wh-1', topic: TOPIC, secret: SECRET });
     const reordered = JSON.stringify({ id: 42, event: 'oro.customer.created' });
