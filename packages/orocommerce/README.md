@@ -271,7 +271,11 @@ version (`StoreScope.FLOW` in `packages/server/engine/src/lib/piece-context/stor
 leftover entry is still visible at that point.
 
 A rejected delivery is logged with `console.warn` and returns `[]` — no run is created, the caller
-still gets its 200, and no secret material reaches the log. The success path returns
+still gets its 200, and no secret material reaches the log. The log line reads `context.flows` and
+`context.step` through optional chaining: `step` only exists on the trigger run context since
+Activepieces 0.71.0 (engine commit `d64d7bf8f3`), and a plain property access would turn "discard
+the forged delivery" into a thrown `TypeError` on older engines — on the security path, of all
+places. The success path returns
 `[context.payload.body]`; returning the whole payload would change the output schema of every
 existing flow.
 

@@ -142,7 +142,7 @@ export const oroWebhookTopicTrigger = createTrigger({
 
     if (rejection !== undefined) {
       console.warn(
-        `OroCommerce webhook delivery discarded (flow ${context.flows.current.id}, step "${context.step.name}"): ${rejection}.`
+        `OroCommerce webhook delivery discarded (flow ${context.flows?.current?.id ?? 'unknown'}, step "${context.step?.name ?? 'unknown'}"): ${rejection}.`
       );
       return [];
     }
