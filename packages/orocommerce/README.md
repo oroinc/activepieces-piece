@@ -52,6 +52,15 @@ to-many relationship is a **full replace** — see *Update actions replace to-ma
 dropdown lists only the topics your connection can read. Enabling the trigger registers the webhook
 in Oro; disabling it removes the registration.
 
+**Sign webhook deliveries** is on by default. Enabling the trigger then generates a secret, hands it
+to Oro at registration, and every later delivery must carry a matching `Webhook-Signature` header or
+it is discarded without starting a run. This needs **OroCommerce 6.1 or newer** — older versions
+reject the secret and the registration fails, so turn the checkbox off for them. With signing off,
+anyone who learns the webhook URL can start the flow with a payload of their choosing.
+
+The secret cannot be read back or changed after registration. To rotate it, disable and re-enable
+the trigger, which deletes the old webhook and registers a new one.
+
 ## Reporting issues
 
 Open an issue at <https://github.com/oroinc/activepieces/issues> with your OroCommerce version, the
@@ -234,6 +243,41 @@ record — and is not used here.
 `sanitizeJsonApiBody` in `client.ts` drops an empty `included: []` and any empty
 `attributes: {}` / `relationships: {}` object from `data` before sending, so action code can build
 those containers unconditionally without emitting empty ones on the wire.
+
+## Webhook deliveries are verified against the raw body
+
+Oro signs the exact bytes it sends: `hash_hmac('sha256', rawBody, secret)`, hex, in the
+`Webhook-Signature` header. `run` therefore verifies `context.payload.rawBody`, never a
+re-serialized `context.payload.body` — JSON round-tripping reorders keys and changes whitespace, and
+the digest would never match.
+
+Verification keys off *the trigger having stored a secret*, not off the header being present. Oro
+sends no signature at all when a webhook has no secret configured, so trusting header presence would
+let an attacker skip verification by omitting the header. A store entry written before this feature
+existed has no `secret`, and that absence means "keep running unverified" — no migration, no version
+field.
+
+`onEnable` creates the Oro webhook before it can store the secret, so a failing `store.put` would
+otherwise leave a live webhook whose secret is unrecoverable and whose every delivery is discarded
+forever. The `put` is wrapped: on failure the webhook is deleted (errors from that delete are
+swallowed) and the original error is rethrown.
+
+`onEnable` also deletes a leftover registration found in the store before creating a replacement.
+Republishing a flow calls `triggerSourceService.enable` without ever calling `disable`
+(`flow.service.ts` → `flow-service-side-effects.ts` → `trigger-source-service.ts`), so `onEnable`
+really does run without a matching `onDisable`; without that cleanup every republish would leak an
+Oro webhook whose secret is no longer stored anywhere. The store is keyed by `flowId`, not by flow
+version (`StoreScope.FLOW` in `packages/server/engine/src/lib/piece-context/store.ts`), so the
+leftover entry is still visible at that point.
+
+A rejected delivery is logged with `console.warn` and returns `[]` — no run is created, the caller
+still gets its 200, and no secret material reaches the log. The success path returns
+`[context.payload.body]`; returning the whole payload would change the output schema of every
+existing flow.
+
+The HMAC comparison mirrors `verifyHmacAuth` in
+`packages/pieces/core/webhook/src/lib/triggers/catch-hook.ts` — explicit length check, then
+`timingSafeEqual`. It is copied rather than imported: pieces may not depend on each other.
 
 ## Local development
 
