@@ -30,6 +30,13 @@ Activepieces verifies the connection with `GET regions/US-CA`. If the OAuth appl
 cannot read `regions`, the connection is reported invalid even when the credentials are correct —
 grant that permission or the check will keep failing.
 
+**The OAuth application's organization scopes every record the connection can reach.** A customer,
+order or user that belongs to another organization answers `403 No access to the entity` — the same
+status a missing permission produces, so it reads as an authentication problem when it is not one. If
+a record you can see in the back office is invisible to a step, check the organization on the OAuth
+application's user before touching its roles. On a multi-organization instance you need one connection
+per organization.
+
 ## Actions
 
 | Action | What it does |
@@ -51,6 +58,10 @@ to-many relationship is a **full replace** — see *Update actions replace to-ma
 **Oro Webhook Event** — starts a flow when the selected OroCommerce webhook topic fires. The topic
 dropdown lists only the topics your connection can read. Enabling the trigger registers the webhook
 in Oro; disabling it removes the registration.
+
+An entity publishes no topics until it is opened up in Oro: **System → Entities → Entity Management →
+the entity → Webhook accessible = Yes**. Until then the Topic dropdown offers nothing for it, and
+publishing a flow whose trigger names one of its topics fails with `valid webhook topic constraint`.
 
 **Sign webhook deliveries** is on by default. Enabling the trigger then generates a secret, hands it
 to Oro at registration, and every later delivery must carry a matching `Webhook-Signature` header or
@@ -384,18 +395,28 @@ client secret always come from the connection.
   iterates `LocalesEnum` (`packages/core/utils/src/lib/locale.ts`), which has no Polish or
   Ukrainian. The gate keeps them in sync so they are ready if those locales are added, and
   `i18n:check` prints a warning for each.
-- **An untouched `Property.Checkbox` arrives as `false`, not `undefined`.** The builder seeds an
-  unset checkbox with `property.defaultValue ?? false`
+- **An untouched `Property.Checkbox` arrives as `false`, not `undefined`, so no update action may use
+  one.** The builder seeds an unset checkbox with `property.defaultValue ?? false`
   (`packages/web/src/features/pieces/utils/form-utils.tsx`) and persists it into the step input, and
   `checkboxProcessor` passes `false` through — it is the one property type whose "empty" form value is
-  not normalised to `undefined` the way `textProcessor` and `numberProcessor` normalise theirs. So
-  `p.enabled ?? undefined` is `false`, `pickDefined` keeps it, and `update-user` / `update-customer-user`
-  send `enabled: false` on every call while `assertUpdateNotEmpty` can never fire for them. Fixing it
-  means a three-state prop (a `Property.StaticDropdown` with a "leave unchanged" option, as in
-  `campaign-monitor/src/lib/actions/update-subscriber-details.ts`), which changes the props and so
-  needs an i18n regeneration — do not paper over it with a `defaultValue`, since `true` would
-  unconditionally *enable* instead. Hand-written `propsValue` in `test/action-guards.test.ts` does not
-  reproduce this; a builder-shaped case must include `enabled: false`.
+  not normalised to `undefined` the way `textProcessor` and `numberProcessor` normalise theirs. A
+  checkbox therefore cannot say "leave this alone": `update-user` and `update-customer-user` used to
+  send `enabled: false` on every call and disable the account they were only asked to rename, and
+  `assertUpdateNotEmpty` could never fire for them. Those flags are now `booleanUpdateDropdown` in
+  `src/lib/common/props.ts` — a three-state `Property.StaticDropdown` defaulting to *Leave unchanged*,
+  as in `campaign-monitor/src/lib/actions/update-subscriber-details.ts` — read back with
+  `readBooleanUpdate`, which also ignores the `false` a step saved by the checkbox version still
+  holds, so an existing flow stops disabling its target. Give any new boolean on an update action the
+  same treatment. A `defaultValue` is not a fix: `true` would unconditionally *enable* instead. Create
+  actions keep their checkboxes, where an unchecked box and `false` mean the same thing. Note that a
+  hand-written `propsValue` in `test/action-guards.test.ts` does not reproduce the builder's `false` —
+  a case that stands in for a saved step has to pass it explicitly.
+
+- **The invoice attachment is sent as `application/pdf`, so `create-invoice` checks that it is one.**
+  Oro takes a file's type from the `mimeType` in the request and does not sniff the content: a PNG
+  attached to *Invoice PDF* was accepted and stored with extension `png` and mime type
+  `application/pdf`, which every consumer that trusts the type then serves as a broken PDF.
+  `readPdfContent` rejects anything whose first bytes are not `%PDF-` before the request is built.
 - Line-item input is validated through `lineItemUtils` (`src/lib/common/line-items.ts`), not bare
   `Number()`. `Number(undefined)` is `NaN` and `JSON.stringify` serialises `NaN` as `null`, so an
   unvalidated missing quantity used to reach Oro as `null` with no error. Route any new line-item

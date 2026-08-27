@@ -65,7 +65,11 @@ function parseAdditionalRelations(
   }
   const obj = parsed as Record<string, unknown>;
   for (const [key, value] of Object.entries(obj)) {
-    if (value === null) continue;
+    if (value === null) {
+      throw new Error(
+        `Additional Relations: "${key}" is null. A relationship is a linkage object: {"data": {"type": "myentities", "id": "1"}} for one record, {"data": [...]} for several, {"data": null} for none.`
+      );
+    }
     if (typeof value !== 'object') {
       throw new Error(
         `Additional Relations: "${key}" must be a JSON:API linkage object with a "data" key, e.g. {"data": {"type": "myentities", "id": "1"}}.`
