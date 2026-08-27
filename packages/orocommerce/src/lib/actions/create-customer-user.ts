@@ -15,8 +15,8 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
 } from '../common';
-import { OroAuth } from '../common/types';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const createCustomerUserAction = createAction({
@@ -33,7 +33,8 @@ export const createCustomerUserAction = createAction({
     }),
     password: Property.ShortText({
       displayName: 'Password',
-      description: 'Password for the new account. Must comply with the system security policy.',
+      description:
+        'Password for the new account. Must comply with the system security policy. Stored in clear text in this step and visible to anyone who can open the flow, so prefer a value carried in from a secret store over a literal one.',
       required: true,
     }),
 
@@ -67,13 +68,15 @@ export const createCustomerUserAction = createAction({
     // -- Optional attributes ---------------------------------------------------
     enabled: Property.Checkbox({
       displayName: 'Enabled',
-      description: 'When disabled the user cannot log into the storefront. Defaults to true.',
+      description:
+        'When disabled the user cannot log into the storefront. Defaults to true, so the account is active as soon as it is created.',
       required: false,
       defaultValue: true,
     }),
     confirmed: Property.Checkbox({
       displayName: 'Confirmed',
-      description: 'Whether the user has completed email confirmation. Defaults to true.',
+      description:
+        'Whether the user has completed email confirmation. Defaults to true, which marks the account confirmed without sending a confirmation email. Uncheck it to require the user to confirm their address.',
       required: false,
       defaultValue: true,
     }),
@@ -178,9 +181,9 @@ export const createCustomerUserAction = createAction({
     const response = await oroApiCall({
       method: HttpMethod.POST,
       resourceUri: '/customerusers',
-      auth: context.auth as OroAuth,
+      auth: context.auth,
       body,
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;
