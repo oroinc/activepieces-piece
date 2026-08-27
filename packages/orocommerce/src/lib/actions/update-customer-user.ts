@@ -8,6 +8,8 @@ import {
   organizationDropdown,
   userDropdown,
   websiteDropdown,
+  booleanUpdateDropdown,
+  readBooleanUpdate,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
@@ -65,15 +67,13 @@ export const updateCustomerUserAction = createAction({
       required: false,
     }),
 
-    enabled: Property.Checkbox({
+    enabled: booleanUpdateDropdown({
       displayName: 'Enabled',
       description: 'Enable or disable the storefront account.',
-      required: false,
     }),
-    confirmed: Property.Checkbox({
+    confirmed: booleanUpdateDropdown({
       displayName: 'Confirmed',
       description: 'Whether the user has completed email confirmation.',
-      required: false,
     }),
     birthday: Property.ShortText({
       displayName: 'Birthday',
@@ -109,8 +109,8 @@ export const updateCustomerUserAction = createAction({
         firstName: p.firstName,
         lastName: p.lastName,
         password: p.password,
-        enabled: p.enabled ?? undefined,
-        confirmed: p.confirmed ?? undefined,
+        enabled: readBooleanUpdate(p.enabled),
+        confirmed: readBooleanUpdate(p.confirmed),
         namePrefix: p.namePrefix,
         middleName: p.middleName,
         nameSuffix: p.nameSuffix,

@@ -63,6 +63,43 @@ describe('create invoice rejects unusable line items before calling Oro', () => 
   });
 });
 
+// The builder seeds an unset checkbox with `false` and persists it, so before these props became
+// three-state dropdowns "Update User, change the last name" also sent enabled: false and disabled
+// the account. The empty-request guard is the observable: if the flag still reached `attributes`,
+// there would be something to update and no error.
+describe('an untouched boolean flag is not sent', () => {
+  it('Update User leaves Enabled alone', async () => {
+    await expect(
+      updateUserAction.run(
+        createMockActionContext<typeof updateUserAction.props>({
+          propsValue: { userId: '1', enabled: 'unchanged' },
+        })
+      )
+    ).rejects.toThrow('Update User: nothing to update.');
+  });
+
+  it('Update User ignores a `false` left behind by the checkbox version of the prop', async () => {
+    await expect(
+      updateUserAction.run(
+        createMockActionContext<typeof updateUserAction.props>({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the prop no longer accepts a boolean; an existing step input still holds one
+          propsValue: { userId: '1', enabled: false as any },
+        })
+      )
+    ).rejects.toThrow('Update User: nothing to update.');
+  });
+
+  it('Update Customer User leaves Enabled and Confirmed alone', async () => {
+    await expect(
+      updateCustomerUserAction.run(
+        createMockActionContext<typeof updateCustomerUserAction.props>({
+          propsValue: { customerUserId: '1', enabled: 'unchanged', confirmed: 'unchanged' },
+        })
+      )
+    ).rejects.toThrow('Update Customer User: nothing to update.');
+  });
+});
+
 describe('update actions refuse to send an empty request', () => {
   it('Update Customer', async () => {
     await expect(

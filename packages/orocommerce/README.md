@@ -336,18 +336,22 @@ client secret always come from the connection.
   iterates `LocalesEnum` (`packages/core/utils/src/lib/locale.ts`), which has no Polish or
   Ukrainian. The gate keeps them in sync so they are ready if those locales are added, and
   `i18n:check` prints a warning for each.
-- **An untouched `Property.Checkbox` arrives as `false`, not `undefined`.** The builder seeds an
-  unset checkbox with `property.defaultValue ?? false`
+- **An untouched `Property.Checkbox` arrives as `false`, not `undefined`, so no update action may use
+  one.** The builder seeds an unset checkbox with `property.defaultValue ?? false`
   (`packages/web/src/features/pieces/utils/form-utils.tsx`) and persists it into the step input, and
   `checkboxProcessor` passes `false` through — it is the one property type whose "empty" form value is
-  not normalised to `undefined` the way `textProcessor` and `numberProcessor` normalise theirs. So
-  `p.enabled ?? undefined` is `false`, `pickDefined` keeps it, and `update-user` / `update-customer-user`
-  send `enabled: false` on every call while `assertUpdateNotEmpty` can never fire for them. Fixing it
-  means a three-state prop (a `Property.StaticDropdown` with a "leave unchanged" option, as in
-  `campaign-monitor/src/lib/actions/update-subscriber-details.ts`), which changes the props and so
-  needs an i18n regeneration — do not paper over it with a `defaultValue`, since `true` would
-  unconditionally *enable* instead. Hand-written `propsValue` in `test/action-guards.test.ts` does not
-  reproduce this; a builder-shaped case must include `enabled: false`.
+  not normalised to `undefined` the way `textProcessor` and `numberProcessor` normalise theirs. A
+  checkbox therefore cannot say "leave this alone": `update-user` and `update-customer-user` used to
+  send `enabled: false` on every call and disable the account they were only asked to rename, and
+  `assertUpdateNotEmpty` could never fire for them. Those flags are now `booleanUpdateDropdown` in
+  `src/lib/common/props.ts` — a three-state `Property.StaticDropdown` defaulting to *Leave unchanged*,
+  as in `campaign-monitor/src/lib/actions/update-subscriber-details.ts` — read back with
+  `readBooleanUpdate`, which also ignores the `false` a step saved by the checkbox version still
+  holds, so an existing flow stops disabling its target. Give any new boolean on an update action the
+  same treatment. A `defaultValue` is not a fix: `true` would unconditionally *enable* instead. Create
+  actions keep their checkboxes, where an unchecked box and `false` mean the same thing. Note that a
+  hand-written `propsValue` in `test/action-guards.test.ts` does not reproduce the builder's `false` —
+  a case that stands in for a saved step has to pass it explicitly.
 - Line-item input is validated through `lineItemUtils` (`src/lib/common/line-items.ts`), not bare
   `Number()`. `Number(undefined)` is `NaN` and `JSON.stringify` serialises `NaN` as `null`, so an
   unvalidated missing quantity used to reach Oro as `null` with no error. Route any new line-item

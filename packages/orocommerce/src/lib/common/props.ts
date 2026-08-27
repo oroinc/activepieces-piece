@@ -704,6 +704,45 @@ export const customerUserRolesMultiDropdown = makeMultiSelectDropdown({
   labelFn: attrLabel('label', 'role'),
 });
 
+// --- Boolean flags on update actions ------------------------------------------
+
+// An untouched Property.Checkbox arrives as `false`, not `undefined` (see the README gotcha), so a
+// checkbox cannot say "leave this alone" — an update action built on one sends the flag off on every
+// run and disables the record it was only meant to rename. A three-state dropdown can say it.
+export const LEAVE_UNCHANGED = 'unchanged';
+
+export function booleanUpdateDropdown({
+  displayName,
+  description,
+}: {
+  displayName: string;
+  description: string;
+}) {
+  return Property.StaticDropdown<BooleanUpdateValue, false>({
+    displayName,
+    description,
+    required: false,
+    defaultValue: LEAVE_UNCHANGED,
+    options: {
+      options: [
+        { label: 'Leave unchanged', value: LEAVE_UNCHANGED },
+        { label: 'Yes', value: 'true' },
+        { label: 'No', value: 'false' },
+      ],
+    },
+  });
+}
+
+// Only the dropdown's own string values change anything. A boolean `false` is what a step saved by
+// the earlier checkbox version of these props left behind, where it meant "untouched" at least as
+// often as it meant "disable" — it is ignored rather than replayed, so an existing flow stops
+// disabling its target. Set the dropdown to "No" to disable deliberately.
+export function readBooleanUpdate(value: unknown): boolean | undefined {
+  if (value === 'true' || value === true) return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
 // --- Additional Attributes / Relations (custom entity fields) -----------------
 
 export const additionalAttributesProp = Property.Json({
@@ -729,6 +768,8 @@ export const additionalHeadersProp = Property.Object({
 });
 
 // --- Private helpers ----------------------------------------------------------
+
+type BooleanUpdateValue = typeof LEAVE_UNCHANGED | 'true' | 'false';
 
 function buildProductNameMap(
   included: {
