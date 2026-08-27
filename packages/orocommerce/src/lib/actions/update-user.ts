@@ -10,6 +10,8 @@ import {
   userRolesMultiDropdown,
   userGroupsMultiDropdown,
   userAuthStatusDropdown,
+  booleanUpdateDropdown,
+  readBooleanUpdate,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
@@ -84,10 +86,9 @@ export const updateUserAction = createAction({
       description: 'Birth date in YYYY-MM-DD format.',
       required: false,
     }),
-    enabled: Property.Checkbox({
+    enabled: booleanUpdateDropdown({
       displayName: 'Enabled',
       description: 'Enable or disable the user account.',
-      required: false,
     }),
 
     // -- Relationships ---------------------------------------------------------
@@ -117,7 +118,7 @@ export const updateUserAction = createAction({
         password: p.password,
         firstName: p.firstName,
         lastName: p.lastName,
-        enabled: p.enabled ?? undefined,
+        enabled: readBooleanUpdate(p.enabled),
         namePrefix: p.namePrefix,
         middleName: p.middleName,
         nameSuffix: p.nameSuffix,
