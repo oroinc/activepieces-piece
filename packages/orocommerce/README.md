@@ -30,6 +30,13 @@ Activepieces verifies the connection with `GET regions/US-CA`. If the OAuth appl
 cannot read `regions`, the connection is reported invalid even when the credentials are correct —
 grant that permission or the check will keep failing.
 
+**The OAuth application's organization scopes every record the connection can reach.** A customer,
+order or user that belongs to another organization answers `403 No access to the entity` — the same
+status a missing permission produces, so it reads as an authentication problem when it is not one. If
+a record you can see in the back office is invisible to a step, check the organization on the OAuth
+application's user before touching its roles. On a multi-organization instance you need one connection
+per organization.
+
 ## Actions
 
 | Action | What it does |
@@ -51,6 +58,10 @@ to-many relationship is a **full replace** — see *Update actions replace to-ma
 **Oro Webhook Event** — starts a flow when the selected OroCommerce webhook topic fires. The topic
 dropdown lists only the topics your connection can read. Enabling the trigger registers the webhook
 in Oro; disabling it removes the registration.
+
+An entity publishes no topics until it is opened up in Oro: **System → Entities → Entity Management →
+the entity → Webhook accessible = Yes**. Until then the Topic dropdown offers nothing for it, and
+publishing a flow whose trigger names one of its topics fails with `valid webhook topic constraint`.
 
 ## Reporting issues
 
