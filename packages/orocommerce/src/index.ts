@@ -19,8 +19,8 @@ import {
 export const orocommerce = createPiece({
   displayName: 'OroCommerce',
   auth: oroAuth,
-  minimumSupportedRelease: '0.36.1',
-  logoUrl: 'https://static.oroinc.com/logo/O(logo).svg',
+  minimumSupportedRelease: '0.86.0',
+  logoUrl: 'https://static.oroinc.com/logo/O%28logo%29.svg',
   categories: [PieceCategory.COMMERCE],
   description: 'B2B digital commerce solution',
   authors: ['Oro Inc.'],

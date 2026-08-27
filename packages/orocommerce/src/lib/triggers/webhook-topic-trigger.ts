@@ -100,15 +100,16 @@ export const oroWebhookTopicTrigger = createTrigger({
           throwOriginalError: true,
         });
       } catch (error: unknown) {
-        if (error instanceof HttpError) {
-          // Skip already removed webhooks and access denied errors
-          if ([401, 403, 404].includes(error.response.status)) {
-            return;
-          }
-        }
+        const alreadyGone =
+          error instanceof HttpError &&
+          [401, 403, 404].includes(error.response.status);
 
-        throw new Error(formatError({ error }));
+        if (!alreadyGone) {
+          throw new Error(formatError({ error }));
+        }
       }
+
+      await context.store.delete('webhookInfo');
     }
   },
 

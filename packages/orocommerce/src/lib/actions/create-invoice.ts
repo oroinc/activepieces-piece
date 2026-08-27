@@ -12,6 +12,8 @@ import {
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
+  lineItemUtils,
 } from '../common';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
@@ -40,13 +42,13 @@ export const createInvoiceAction = createAction({
     }),
     customer: customerDropdown,
     customerUser: customerUserDropdown(false),
-    refCustomerId: Property.Number({
+    refCustomerId: Property.ShortText({
       displayName: 'External Customer ID',
       description:
         'An optional ID reference to a customer. Can be used for storing an arbitrary external ID.',
       required: false,
     }),
-    refCustomerUserId: Property.Number({
+    refCustomerUserId: Property.ShortText({
       displayName: 'External Customer User ID',
       description:
         'An optional ID reference to a customer user. Can be used for storing an arbitrary external ID.',
@@ -106,17 +108,17 @@ export const createInvoiceAction = createAction({
       description: 'URL for the external payment page.',
       required: false,
     }),
-    invoicePdfContent: Property.LongText({
-      displayName: 'Invoice PDF (Base64)',
+    invoicePdfContent: Property.File({
+      displayName: 'Invoice PDF',
       description:
-        'Base64-encoded PDF file content. When provided, the file is attached to the invoice as the default PDF.',
+        'PDF file to attach to the invoice as the default PDF. Accepts a file from a previous step or a URL.',
       required: false,
     }),
     invoicePdfFilename: Property.ShortText({
       displayName: 'Invoice PDF Filename',
-      description: 'Filename for the attached PDF (e.g. invoice.pdf).',
+      description:
+        'Filename for the attached PDF (e.g. invoice.pdf). Defaults to the uploaded file name.',
       required: false,
-      defaultValue: 'invoice.pdf',
     }),
 
     organization: organizationDropdown,
@@ -125,8 +127,6 @@ export const createInvoiceAction = createAction({
     internalStatus: invoiceInternalStatusDropdown,
 
     // -- Line Items ------------------------------------------------------------
-    // DynamicProperties lets us load product units once as StaticDropdown.
-    // Products are entered as SKU/ID text (framework does not support Dropdown inside Array).
     lineItems: Property.DynamicProperties({
       auth: oroAuth,
       displayName: 'Line Items',
@@ -157,8 +157,9 @@ export const createInvoiceAction = createAction({
               }),
               unitOfQuantity: Property.ShortText({
                 displayName: 'Product Unit',
-                description: 'Unit of measurement (e.g. piece, kg, set).',
-                required: false,
+                description:
+                  'Unit of measurement (e.g. piece, kg, set). Oro rejects a line item without one.',
+                required: true,
               }),
               unitPrice: Property.Number({
                 displayName: 'Unit Price',
@@ -189,27 +190,83 @@ export const createInvoiceAction = createAction({
   async run(context) {
     const p = context.propsValue;
 
-    const dynamicValue = (p.lineItems ?? {}) as Record<string, unknown>;
-    const rawItems = (dynamicValue['lineItems'] ?? []) as Array<
-      Record<string, unknown>
-    >;
+    const rows = lineItemUtils.readRows({
+      value: p.lineItems,
+      arrayKey: 'lineItems',
+      displayName: LINE_ITEMS_DISPLAY_NAME,
+    });
 
-    const lineItemResources = rawItems.map((item, index) => ({
+    const lineItemResources = rows.map((row, index) => ({
       type: 'invoicelineitems',
       id: `li_${index + 1}`,
       attributes: {
         position: index + 1,
-        lineNumber: item['lineNumber'] || String(index + 1),
-        description: item['description'],
-        quantity: Number(item['quantity']),
-        unitOfQuantity: item['unitOfQuantity'],
-        unitPrice: Number(item['unitPrice']),
-        rowTotal: Number(item['rowTotal']),
+        lineNumber:
+          lineItemUtils.optionalString({
+            row,
+            index,
+            field: 'lineNumber',
+            label: 'Line Number',
+            displayName: LINE_ITEMS_DISPLAY_NAME,
+          }) ?? String(index + 1),
+        description: lineItemUtils.requiredString({
+          row,
+          index,
+          field: 'description',
+          label: 'Description',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+        }),
+        quantity: lineItemUtils.requiredNumber({
+          row,
+          index,
+          field: 'quantity',
+          label: 'Quantity',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+          min: 0,
+        }),
+        unitOfQuantity: lineItemUtils.requiredString({
+          row,
+          index,
+          field: 'unitOfQuantity',
+          label: 'Product Unit',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+        }),
+        unitPrice: lineItemUtils.requiredNumber({
+          row,
+          index,
+          field: 'unitPrice',
+          label: 'Unit Price',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+          min: 0,
+        }),
+        rowTotal: lineItemUtils.requiredNumber({
+          row,
+          index,
+          field: 'rowTotal',
+          label: 'Row Total',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+        }),
         ...jsonApiBodyUtils.pickDefined({
-          note: item['note'] as string | undefined,
+          note: lineItemUtils.optionalString({
+            row,
+            index,
+            field: 'note',
+            label: 'Note',
+            displayName: LINE_ITEMS_DISPLAY_NAME,
+          }),
         }),
       },
     }));
+
+    lineItemUtils.assertSumMatches({
+      rows,
+      field: 'rowTotal',
+      label: 'Row Total',
+      displayName: LINE_ITEMS_DISPLAY_NAME,
+      total: p.totalAmount,
+      totalLabel: 'Total Amount',
+      toleranceMinorUnits: 1,
+    });
 
     const lineItemsRelData = lineItemResources.map((li) => ({
       type: 'invoicelineitems',
@@ -221,9 +278,10 @@ export const createInvoiceAction = createAction({
           type: 'files',
           id: 'invoiceDefaultPdfFile',
           attributes: {
-            mimeType: 'application/pdf',
-            originalFilename: p.invoicePdfFilename || 'invoice.pdf',
-            content: p.invoicePdfContent,
+            mimeType: PDF_MIME_TYPE,
+            originalFilename:
+              p.invoicePdfFilename || p.invoicePdfContent.filename,
+            content: readPdfContent(p.invoicePdfContent),
           },
         }
       : undefined;
@@ -283,9 +341,32 @@ export const createInvoiceAction = createAction({
         },
         included,
       },
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;
   },
 });
+
+const LINE_ITEMS_DISPLAY_NAME = 'Line Items';
+
+const PDF_MIME_TYPE = 'application/pdf';
+
+const PDF_SIGNATURE = '%PDF-';
+
+// Oro takes the file's type from the mimeType we send, and this file becomes the invoice's default
+// PDF, so PDF_MIME_TYPE is the only value that makes sense here. Which means the attachment really
+// has to be a PDF: sending anything else stores it under a type it is not, and every consumer that
+// trusts the type — the back-office PDF download included — then serves a broken document. Checking
+// the signature keeps the hardcoded type honest and says which file was wrong while the step can
+// still be fixed.
+function readPdfContent(file: { filename: string; base64: string }): string {
+  // Eight base64 characters decode to the first six bytes — enough for the signature.
+  const header = Buffer.from(file.base64.slice(0, 8), 'base64').toString('latin1');
+  if (!header.startsWith(PDF_SIGNATURE)) {
+    throw new Error(
+      `Invoice PDF: "${file.filename}" is not a PDF (it does not start with "${PDF_SIGNATURE}"). Oro stores this file as the invoice's default PDF, so attach a PDF or convert the file in an earlier step.`
+    );
+  }
+  return file.base64;
+}

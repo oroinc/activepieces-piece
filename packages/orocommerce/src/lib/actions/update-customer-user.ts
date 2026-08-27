@@ -8,11 +8,13 @@ import {
   organizationDropdown,
   userDropdown,
   websiteDropdown,
+  booleanUpdateDropdown,
+  readBooleanUpdate,
   additionalAttributesProp,
   additionalRelationsProp,
   additionalHeadersProp,
+  toHeaderRecord,
 } from '../common';
-import { OroAuth } from '../common/types';
 import { jsonApiBodyUtils } from '../common/jsonapi';
 
 export const updateCustomerUserAction = createAction({
@@ -37,7 +39,8 @@ export const updateCustomerUserAction = createAction({
     }),
     password: Property.ShortText({
       displayName: 'Password',
-      description: 'New password for the account. Must comply with the system security policy.',
+      description:
+        'New password for the account. Must comply with the system security policy. Stored in clear text in this step and visible to anyone who can open the flow, so prefer a value carried in from a secret store over a literal one.',
       required: false,
     }),
 
@@ -64,15 +67,13 @@ export const updateCustomerUserAction = createAction({
       required: false,
     }),
 
-    enabled: Property.Checkbox({
+    enabled: booleanUpdateDropdown({
       displayName: 'Enabled',
       description: 'Enable or disable the storefront account.',
-      required: false,
     }),
-    confirmed: Property.Checkbox({
+    confirmed: booleanUpdateDropdown({
       displayName: 'Confirmed',
       description: 'Whether the user has completed email confirmation.',
-      required: false,
     }),
     birthday: Property.ShortText({
       displayName: 'Birthday',
@@ -108,8 +109,8 @@ export const updateCustomerUserAction = createAction({
         firstName: p.firstName,
         lastName: p.lastName,
         password: p.password,
-        enabled: p.enabled ?? undefined,
-        confirmed: p.confirmed ?? undefined,
+        enabled: readBooleanUpdate(p.enabled),
+        confirmed: readBooleanUpdate(p.confirmed),
         namePrefix: p.namePrefix,
         middleName: p.middleName,
         nameSuffix: p.nameSuffix,
@@ -130,10 +131,16 @@ export const updateCustomerUserAction = createAction({
       ...extraRels,
     };
 
+    jsonApiBodyUtils.assertUpdateNotEmpty({
+      attributes,
+      relationships,
+      actionName: 'Update Customer User',
+    });
+
     const response = await oroApiCall({
       method: HttpMethod.PATCH,
       resourceUri: `/customerusers/${p.customerUserId}`,
-      auth: context.auth as OroAuth,
+      auth: context.auth,
       body: {
         data: {
           type: 'customerusers',
@@ -142,7 +149,7 @@ export const updateCustomerUserAction = createAction({
           relationships,
         },
       },
-      headers: p.additionalHeaders as Record<string, string>,
+      headers: toHeaderRecord({ value: p.additionalHeaders }),
     });
 
     return response.body;
