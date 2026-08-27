@@ -157,8 +157,9 @@ export const createInvoiceAction = createAction({
               }),
               unitOfQuantity: Property.ShortText({
                 displayName: 'Product Unit',
-                description: 'Unit of measurement (e.g. piece, kg, set).',
-                required: false,
+                description:
+                  'Unit of measurement (e.g. piece, kg, set). Oro rejects a line item without one.',
+                required: true,
               }),
               unitPrice: Property.Number({
                 displayName: 'Unit Price',
@@ -223,6 +224,13 @@ export const createInvoiceAction = createAction({
           displayName: LINE_ITEMS_DISPLAY_NAME,
           min: 0,
         }),
+        unitOfQuantity: lineItemUtils.requiredString({
+          row,
+          index,
+          field: 'unitOfQuantity',
+          label: 'Product Unit',
+          displayName: LINE_ITEMS_DISPLAY_NAME,
+        }),
         unitPrice: lineItemUtils.requiredNumber({
           row,
           index,
@@ -239,13 +247,6 @@ export const createInvoiceAction = createAction({
           displayName: LINE_ITEMS_DISPLAY_NAME,
         }),
         ...jsonApiBodyUtils.pickDefined({
-          unitOfQuantity: lineItemUtils.optionalString({
-            row,
-            index,
-            field: 'unitOfQuantity',
-            label: 'Product Unit',
-            displayName: LINE_ITEMS_DISPLAY_NAME,
-          }),
           note: lineItemUtils.optionalString({
             row,
             index,
@@ -277,10 +278,10 @@ export const createInvoiceAction = createAction({
           type: 'files',
           id: 'invoiceDefaultPdfFile',
           attributes: {
-            mimeType: 'application/pdf',
+            mimeType: PDF_MIME_TYPE,
             originalFilename:
               p.invoicePdfFilename || p.invoicePdfContent.filename,
-            content: p.invoicePdfContent.base64,
+            content: readPdfContent(p.invoicePdfContent),
           },
         }
       : undefined;
@@ -348,3 +349,24 @@ export const createInvoiceAction = createAction({
 });
 
 const LINE_ITEMS_DISPLAY_NAME = 'Line Items';
+
+const PDF_MIME_TYPE = 'application/pdf';
+
+const PDF_SIGNATURE = '%PDF-';
+
+// Oro takes the file's type from the mimeType we send, and this file becomes the invoice's default
+// PDF, so PDF_MIME_TYPE is the only value that makes sense here. Which means the attachment really
+// has to be a PDF: sending anything else stores it under a type it is not, and every consumer that
+// trusts the type — the back-office PDF download included — then serves a broken document. Checking
+// the signature keeps the hardcoded type honest and says which file was wrong while the step can
+// still be fixed.
+function readPdfContent(file: { filename: string; base64: string }): string {
+  // Eight base64 characters decode to the first six bytes — enough for the signature.
+  const header = Buffer.from(file.base64.slice(0, 8), 'base64').toString('latin1');
+  if (!header.startsWith(PDF_SIGNATURE)) {
+    throw new Error(
+      `Invoice PDF: "${file.filename}" is not a PDF (it does not start with "${PDF_SIGNATURE}"). Oro stores this file as the invoice's default PDF, so attach a PDF or convert the file in an earlier step.`
+    );
+  }
+  return file.base64;
+}

@@ -117,6 +117,19 @@ describe('jsonApiBodyUtils.parseAdditionalRelations', () => {
       /must be a JSON object/
     );
   });
+
+  // A bare null used to pass straight through to Oro, which answers
+  // 400 "The relationship should have 'data' property" — a request that could never succeed.
+  it('rejects a null value and shows the linkage forms', () => {
+    expect(() =>
+      jsonApiBodyUtils.parseAdditionalRelations({ myRelation: null })
+    ).toThrow('Additional Relations: "myRelation" is null.');
+  });
+
+  it('accepts an explicit empty linkage', () => {
+    const value = { myRelation: { data: null }, myOtherRelation: { data: [] } };
+    expect(jsonApiBodyUtils.parseAdditionalRelations(value)).toEqual(value);
+  });
 });
 
 describe('jsonApiBodyUtils.assertUpdateNotEmpty', () => {

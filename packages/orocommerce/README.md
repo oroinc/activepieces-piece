@@ -352,6 +352,12 @@ client secret always come from the connection.
   actions keep their checkboxes, where an unchecked box and `false` mean the same thing. Note that a
   hand-written `propsValue` in `test/action-guards.test.ts` does not reproduce the builder's `false` —
   a case that stands in for a saved step has to pass it explicitly.
+
+- **The invoice attachment is sent as `application/pdf`, so `create-invoice` checks that it is one.**
+  Oro takes a file's type from the `mimeType` in the request and does not sniff the content: a PNG
+  attached to *Invoice PDF* was accepted and stored with extension `png` and mime type
+  `application/pdf`, which every consumer that trusts the type then serves as a broken PDF.
+  `readPdfContent` rejects anything whose first bytes are not `%PDF-` before the request is built.
 - Line-item input is validated through `lineItemUtils` (`src/lib/common/line-items.ts`), not bare
   `Number()`. `Number(undefined)` is `NaN` and `JSON.stringify` serialises `NaN` as `null`, so an
   unvalidated missing quantity used to reach Oro as `null` with no error. Route any new line-item
