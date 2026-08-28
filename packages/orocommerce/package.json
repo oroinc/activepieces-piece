@@ -31,7 +31,8 @@
     "bundle": "node ../../../../dist/packages/cli/src/index.js pieces bundle",
     "test": "vitest run",
     "i18n:check": "node tools/check-i18n.mjs",
-    "i18n:write": "node tools/check-i18n.mjs --write"
+    "i18n:write": "node tools/check-i18n.mjs --write",
+    "check-scope": "node tools/check-scope.mjs"
   },
   "devDependencies": {
     "vitest": "3.2.6",
