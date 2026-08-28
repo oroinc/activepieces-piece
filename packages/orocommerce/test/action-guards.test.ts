@@ -78,14 +78,21 @@ describe('create invoice rejects unusable line items before calling Oro', () => 
 });
 
 describe('create invoice refuses to file a non-PDF as the invoice PDF', () => {
-  function runWithFile(file: { filename: string; base64: string }) {
+  function runWithPdf({
+    filename,
+    content,
+  }: {
+    filename: string;
+    content: string;
+  }) {
     return createInvoiceAction.run(
       createMockActionContext<typeof createInvoiceAction.props>({
         propsValue: {
           ...invoiceProps([
             { description: 'Widget', quantity: 10, unitOfQuantity: 'piece', unitPrice: 10, rowTotal: 100 },
           ]),
-          invoicePdfContent: file,
+          invoicePdfContent: content,
+          invoicePdfFilename: filename,
         },
       })
     );
@@ -93,18 +100,39 @@ describe('create invoice refuses to file a non-PDF as the invoice PDF', () => {
 
   it('names the file when the content is not a PDF', async () => {
     await expect(
-      // A one-pixel PNG: Oro accepts it and stores it as application/pdf, because that is the
-      // mimeType this action sends for every attachment.
-      runWithFile({ filename: 'chart.png', base64: PNG_BASE64 })
+      runWithPdf({ filename: 'chart.png', content: PNG_BASE64 })
     ).rejects.toThrow(
       'Invoice PDF: "chart.png" is not a PDF (it does not start with "%PDF-").'
     );
   });
 
-  it('accepts content that carries the PDF signature', async () => {
-    // Gets as far as the API call, which the mock context has no connection for — so validation passed.
+  it('falls back to invoice.pdf when no filename is given', async () => {
     await expect(
-      runWithFile({ filename: 'invoice.pdf', base64: PDF_BASE64 })
+      createInvoiceAction.run(
+        createMockActionContext<typeof createInvoiceAction.props>({
+          propsValue: {
+            ...invoiceProps([
+              { description: 'Widget', quantity: 10, unitOfQuantity: 'piece', unitPrice: 10, rowTotal: 100 },
+            ]),
+            invoicePdfContent: PNG_BASE64,
+          },
+        })
+      )
+    ).rejects.toThrow('Invoice PDF: "invoice.pdf" is not a PDF');
+  });
+
+  it('accepts content that carries the PDF signature', async () => {
+    await expect(
+      runWithPdf({ filename: 'invoice.pdf', content: PDF_BASE64 })
+    ).rejects.toThrow('OroCommerce API Error');
+  });
+
+  it('accepts a data: prefixed payload', async () => {
+    await expect(
+      runWithPdf({
+        filename: 'invoice.pdf',
+        content: `data:application/pdf;base64,${PDF_BASE64}`,
+      })
     ).rejects.toThrow('OroCommerce API Error');
   });
 });

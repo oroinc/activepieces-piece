@@ -249,21 +249,26 @@ those containers unconditionally without emitting empty ones on the wire.
 ## Local development
 
 ```bash
-npx turbo run test       --filter=@activepieces/piece-orocommerce   # vitest (builds first)
-npx turbo run i18n:check --filter=@activepieces/piece-orocommerce   # i18n gate (builds first)
-npx turbo run lint       --filter=@activepieces/piece-orocommerce
-npx turbo run build      --filter=@activepieces/piece-orocommerce   # tsc -p tsconfig.lib.json, also the type-check
-npm run lint-dev                                                    # repo-wide lint with auto-fix
+npx turbo run test  --filter=@activepieces/piece-orocommerce   # vitest, i18n gate included (builds first)
+npx turbo run lint  --filter=@activepieces/piece-orocommerce
+npx turbo run build --filter=@activepieces/piece-orocommerce   # tsc -p tsconfig.lib.json, also the type-check
+npm run check-scope                                            # nothing outside this directory changed
+npm run lint-dev                                               # repo-wide lint with auto-fix
 ```
 
 There is no `typecheck` script in this package, so the root `typecheck` task is a no-op here — the
 build is the type-check.
 
-`.github/workflows/ci.yml` runs `test` and `i18n:check` for this piece by name, alongside the other
-packages in its hardcoded filter list. `test/jsonapi-roundtrip.test.ts` guards the
-serialize/deserialize contract above, `test/line-items.test.ts` guards line-item validation,
-`test/body-utils.test.ts` guards the request-body helpers, and `test/action-guards.test.ts` guards
-the checks that stop an action calling Oro with unusable input.
+Nothing in `.github/workflows/` runs these — `poc/orocommerce` is the branch proposed upstream, so
+it carries this directory and `bun.lock` and nothing else. `npm run check-scope` is what enforces
+that: it diffs `origin/main...HEAD` and fails on any file outside this package other than
+`bun.lock`. Pass `--base=origin/poc/orocommerce` to scope it to one PR, and fetch first — a stale
+base ref reports upstream's own changes as offenders.
+
+`test/jsonapi-roundtrip.test.ts` guards the serialize/deserialize contract above,
+`test/line-items.test.ts` guards line-item validation, `test/body-utils.test.ts` guards the
+request-body helpers, `test/action-guards.test.ts` guards the checks that stop an action calling Oro
+with unusable input, and `test/i18n.test.ts` runs the i18n gate below.
 
 ## The i18n gate
 
@@ -271,17 +276,18 @@ the checks that stop an action calling Oro with unusable input.
 translations. Both are generated, not hand-maintained:
 
 ```bash
-npm run cli pieces generate-translation-file orocommerce            # canonical; writes translation.json only
-npx turbo run i18n:write --filter=@activepieces/piece-orocommerce   # also reconciles the locale files (builds first)
+npm run cli pieces generate-translation-file orocommerce   # canonical; writes translation.json only
+npm run build && npm run i18n:write                        # also reconciles the locale files
 ```
 
 The two are not interchangeable. The CLI rewrites `translation.json` and nothing else, and it writes
 no trailing newline; `i18n:write` rewrites all six files and does. Prefer `i18n:write` — it is the
 one that keeps the locale files in step with the source.
 
-`npm run i18n:check` (`tools/check-i18n.mjs`) fails the build when they drift. It imports the
-**built** piece from `dist/` and only checks that the file exists, never that it is current — run it
-through turbo (`npx turbo run i18n:check`), which builds first. It walks the same 19 metadata paths as
+`npm run i18n:check` (`tools/check-i18n.mjs`) fails when they drift, and `test/i18n.test.ts` runs it
+as part of the suite so the root `test` task covers it without a task of its own in the root
+`turbo.json`. It imports the **built** piece from `dist/` and only checks that the file exists, never
+that it is current — run it through turbo (`npx turbo run test`), which builds first. It walks the same 19 metadata paths as
 `pieceTranslation.pathsToValuesToTranslate` in `packages/pieces/framework/src/lib/i18n.ts`, and
 truncates keys at 512 characters exactly as the official generator does. It fails on keys missing
 from or stale in `translation.json`, on any locale file whose key set differs from it, and on empty
@@ -299,7 +305,9 @@ Four actions take a password: `create-user`, `update-user`, `create-customer-use
 `update-customer-user`. Their values are ordinary step inputs — rendered in clear text in the
 builder, persisted in the flow version, and stored in step inputs. Run-log input truncation
 (`AP_FLOW_RUN_LOG_INPUT_TRUNCATE_THRESHOLD_KB`, 2 KB) does not help; a password is far under the
-threshold. The prop descriptions say so, which is the only mitigation available today.
+threshold. The prop descriptions point at a secret store, which is the only mitigation available
+today. `update-user` can change username, email, password and auth status in one call, so it can
+lock an existing user out of their account.
 
 There is no `Property.SecretText` to switch to. `SecretTextProperty` exists, but only as a
 `PieceAuthProperty` reachable through `PieceAuth.SecretText`, and it is deliberately absent from the
