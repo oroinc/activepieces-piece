@@ -72,6 +72,10 @@ anyone who learns the webhook URL can start the flow with a payload of their cho
 The secret cannot be read back or changed after registration. To rotate it, disable and re-enable
 the trigger, which deletes the old webhook and registers a new one.
 
+Flows enabled before signing existed keep running unverified until they are next re-enabled or
+republished. On an instance older than 6.1, turn the checkbox off before doing either, or the
+registration fails and the flow stays disabled.
+
 ## Reporting issues
 
 Open an issue at <https://github.com/oroinc/activepieces/issues> with your OroCommerce version, the
