@@ -37,7 +37,7 @@ export const createUserAction = createAction({
     password: Property.ShortText({
       displayName: 'Password',
       description:
-        'Password for the new account. Must comply with the system security policy. Stored in clear text in this step and visible to anyone who can open the flow, so prefer a value carried in from a secret store over a literal one.',
+        'Password for the new account. Prefer a value from a secret store over a literal one.',
       required: true,
     }),
     firstName: Property.ShortText({

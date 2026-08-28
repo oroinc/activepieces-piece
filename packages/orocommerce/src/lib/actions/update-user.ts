@@ -24,7 +24,7 @@ export const updateUserAction = createAction({
   name: 'update_user',
   displayName: 'Update User',
   description:
-    'Updates an existing back-office user in OroCommerce. Only provided fields are changed. Username, email, password and auth status can all be changed in one call, so this action can lock an existing user out of their account.',
+    'Updates an existing back-office user in OroCommerce. Only provided fields are changed.',
   props: {
     // -- Target record ---------------------------------------------------------
     userId: Property.ShortText({
@@ -47,7 +47,7 @@ export const updateUserAction = createAction({
     password: Property.ShortText({
       displayName: 'Password',
       description:
-        'New password for the account. Must comply with the system security policy. Stored in clear text in this step and visible to anyone who can open the flow, so prefer a value carried in from a secret store over a literal one.',
+        'New password for the account. Prefer a value from a secret store over a literal one.',
       required: false,
     }),
     firstName: Property.ShortText({
