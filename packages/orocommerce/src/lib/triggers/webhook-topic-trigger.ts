@@ -48,9 +48,7 @@ export const oroWebhookTopicTrigger = createTrigger({
     signDeliveries: Property.Checkbox({
       displayName: 'Sign webhook deliveries',
       description:
-        'Register the webhook with a shared secret and discard deliveries whose "Webhook-Signature" header does not match the body. ' +
-        'Requires OroCommerce 6.1 or newer: older versions reject the secret and the registration fails. ' +
-        'Turn this off only for those versions, and be aware that anyone who learns the webhook URL can then start this flow.',
+        'Register the webhook with a shared secret and discard deliveries whose "Webhook-Signature" header does not match the body. Needs OroCommerce 6.1 or newer; turn off for older versions.',
       required: false,
       defaultValue: true,
     }),
