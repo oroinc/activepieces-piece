@@ -48,7 +48,7 @@ export const oroWebhookTopicTrigger = createTrigger({
     signDeliveries: Property.Checkbox({
       displayName: 'Sign webhook deliveries',
       description:
-        'Register the webhook with a shared secret and discard deliveries whose "Webhook-Signature" header does not match the body. Needs OroCommerce 6.1 or newer; turn off for older versions.',
+        'Register the webhook with a shared secret and discard deliveries whose "Webhook-Signature" header does not match the body.',
       required: false,
       defaultValue: true,
     }),
@@ -57,6 +57,9 @@ export const oroWebhookTopicTrigger = createTrigger({
   sampleData: {},
 
   async onEnable(context) {
+    // Republishing a flow runs onEnable without a matching onDisable, so the
+    // previous registration would stay live in Oro holding a secret nothing
+    // stores anymore. Drop it before creating the replacement.
     const staleInfo = await context.store.get<WebhookInformation>('webhookInfo');
     if (staleInfo !== null && staleInfo !== undefined) {
       await discardWebhook({ auth: context.auth, webhookId: staleInfo.webhookId });
