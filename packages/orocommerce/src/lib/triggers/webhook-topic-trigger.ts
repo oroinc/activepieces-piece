@@ -57,8 +57,8 @@ export const oroWebhookTopicTrigger = createTrigger({
   sampleData: {},
 
   async onEnable(context) {
-    // Republishing a flow runs onEnable without a matching onDisable, so the
-    // previous registration would stay live in Oro holding a secret nothing
+    // Defensive: on any path where onEnable runs without a matching onDisable,
+    // the previous registration would stay live in Oro holding a secret nothing
     // stores anymore. Drop it before creating the replacement.
     const staleInfo = await context.store.get<WebhookInformation>('webhookInfo');
     if (staleInfo !== null && staleInfo !== undefined) {
