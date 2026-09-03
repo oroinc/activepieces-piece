@@ -256,5 +256,7 @@
   "Oro Webhook Event": "Oro Webhook Event",
   "Trigger when a selected webhook event is raised": "Trigger when a selected webhook event is raised",
   "Topic": "Topic",
-  "Only topics accessible by your connection are shown": "Only topics accessible by your connection are shown"
+  "Sign webhook deliveries": "Sign webhook deliveries",
+  "Only topics accessible by your connection are shown": "Only topics accessible by your connection are shown",
+  "Register the webhook with a shared secret and discard deliveries whose \"Webhook-Signature\" header does not match the body.": "Register the webhook with a shared secret and discard deliveries whose \"Webhook-Signature\" header does not match the body."
 }

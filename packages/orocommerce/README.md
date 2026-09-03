@@ -63,6 +63,19 @@ An entity publishes no topics until it is opened up in Oro: **System → Entitie
 the entity → Webhook accessible = Yes**. Until then the Topic dropdown offers nothing for it, and
 publishing a flow whose trigger names one of its topics fails with `valid webhook topic constraint`.
 
+**Sign webhook deliveries** is on by default. Enabling the trigger then generates a secret, hands it
+to Oro at registration, and every later delivery must carry a matching `Webhook-Signature` header or
+it is discarded without starting a run. Turn it off only when something between Oro and Activepieces
+rewrites the request body — the signature covers the exact bytes delivered, so a proxy that re-encodes
+the body makes every delivery fail verification. With signing off, anyone who learns the webhook URL
+can start the flow with a payload of their choosing.
+
+The secret cannot be read back or changed after registration. To rotate it, disable and re-enable
+the trigger, which deletes the old webhook and registers a new one.
+
+Flows enabled before signing existed keep running unverified until they are next re-enabled or
+republished.
+
 ## Reporting issues
 
 Open an issue at <https://github.com/oroinc/activepieces/issues> with your OroCommerce version, the
@@ -245,6 +258,25 @@ record — and is not used here.
 `sanitizeJsonApiBody` in `client.ts` drops an empty `included: []` and any empty
 `attributes: {}` / `relationships: {}` object from `data` before sending, so action code can build
 those containers unconditionally without emitting empty ones on the wire.
+
+## Webhook deliveries are verified against the raw body
+
+Oro signs the exact bytes it sends: `hash_hmac('sha256', rawBody, secret)`, hex, in the
+`Webhook-Signature` header. Verification therefore covers `context.payload.rawBody`, never a
+re-serialized `context.payload.body` — JSON round-tripping reorders keys and the digest would never
+match.
+
+Verification runs only when this trigger has a secret stored. Oro sends no signature header when a
+webhook has no secret, so header presence is never trusted. A store entry written before signing
+existed has no secret, and that absence means "keep running unverified".
+
+`onEnable` deletes the webhook it just created when storing the secret fails — a live webhook whose
+secret is unrecoverable would have every delivery discarded — and drops a leftover registration
+before creating a replacement, because republishing a flow runs `onEnable` without `onDisable`.
+
+A rejected delivery returns `[]` with a `console.warn`: no run is created and Oro still gets its
+200, so a wrong secret looks like silence. If a signed trigger goes quiet, check the worker logs for
+"webhook delivery discarded".
 
 ## Local development
 
