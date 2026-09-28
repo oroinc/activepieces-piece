@@ -55,6 +55,12 @@ jobs:
       - name: Verify artifact
         run: npm run verify
 
+      # Most of the piece's surface comes from upstream, so a pin bump can rename a label or make a
+      # field optional with nothing in this repository changing. This fails the build when that
+      # happens, so the change has to be accepted in the pull request that causes it.
+      - name: Check the metadata snapshot
+        run: npm run metadata:check
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
