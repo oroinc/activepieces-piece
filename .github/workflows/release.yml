@@ -1,0 +1,142 @@
+name: Release
+
+# A release is cut by pushing a tag. Everything else here is guard rails: the tag has to name the
+# version that is committed, the commit has to be on main, the build has to pass every check CI
+# runs, and an artifact that is already released or already on npm is never replaced.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  # A dry run. It builds and prints the notes a real release would carry, and stops there. It runs
+  # only when the release path itself changes, because everything it builds is already covered by
+  # CI; what it proves is that the release job still works after an edit to it.
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/actions/build-piece/**'
+      - 'scripts/release-notes.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  # Never cancel a release halfway: it may already have created the release or published to npm.
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.notes.outputs.package }}
+      version: ${{ steps.notes.outputs.version }}
+      tarball: ${{ steps.notes.outputs.tarball }}
+    steps:
+      # Full history, because the tag check below has to know whether the tagged commit is on main.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Runs before the build, so a tag that should not exist fails in seconds rather than after a
+      # full build. It is skipped on the dry run, where there is no tag to check.
+      - name: Check the tag matches the version and sits on main
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./packages/orocommerce/package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "The tag is $GITHUB_REF_NAME but packages/orocommerce/package.json says $version."
+            echo "Merge the version bump first, then tag the merge commit v$version."
+            exit 1
+          fi
+          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_SHA is not on main. A release is only ever cut from main."
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME matches version $version, and $GITHUB_SHA is on main."
+
+      # The same action CI uses, so a tag is built and checked exactly the way a pull request is.
+      - uses: ./.github/actions/build-piece
+
+      - name: Write the release notes
+        id: notes
+        env:
+          # On a pull request GITHUB_SHA is the test merge commit, which exists nowhere afterwards;
+          # the head commit is the one worth recording in a dry run.
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$TAG" ]; then
+            npm run --silent release:notes -- --tag "$TAG" --commit "$COMMIT"
+          else
+            npm run --silent release:notes -- --commit "$COMMIT"
+          fi
+          cat artifacts/release-notes.md >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"package=\(.name)", "version=\(.version)", "tarball=\(.tarball)"' \
+            artifacts/release-identity.json >> "$GITHUB_OUTPUT"
+
+      - name: Upload the artifact and the notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.notes.outputs.version }}
+          path: |
+            artifacts/*.tgz
+            artifacts/release-notes.md
+            artifacts/release-identity.json
+          if-no-files-found: error
+
+  release:
+    needs: build
+    # Only a tag push gets past here. The dry run ends with the job above.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and upload the .tgz to it
+      id-token: write # provenance for npm publish
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ needs.build.outputs.version }}
+          path: artifacts
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A release for $GITHUB_REF_NAME already exists. Leaving it exactly as it is."
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file artifacts/release-notes.md \
+            artifacts/*.tgz
+
+      # Publishing is off until somebody turns it on: set the repository variable
+      # NPM_PUBLISH_ENABLED to "true". Until then a tag produces a GitHub release and nothing else.
+      - uses: actions/setup-node@v4
+        if: vars.NPM_PUBLISH_ENABLED == 'true'
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish to npm
+        if: vars.NPM_PUBLISH_ENABLED == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE: ${{ needs.build.outputs.package }}
+          VERSION: ${{ needs.build.outputs.version }}
+          TARBALL: ${{ needs.build.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          # A version on npm is permanent and is never replaced. If it is there, this run has
+          # nothing to do, whatever the reason it got there.
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION is already on npm. Not republishing."
+            exit 0
+          fi
+          npm publish "artifacts/$TARBALL" --provenance --access public
