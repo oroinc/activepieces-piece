@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # The fetched upstream tree is reproducible from .ap-pin alone, so the pin file is the whole
+      # cache key: change the pin and the cache misses, which is exactly when it should.
+      - name: Cache the upstream checkout
+        uses: actions/cache@v4
+        with:
+          path: .ap-src
+          key: ap-src-${{ hashFiles('.ap-pin') }}
+
+      - name: Fetch Activepieces sources
+        run: npm run ap:fetch
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Bundle runs before the tests, not after them. check-i18n.mjs reads the built piece to learn
+      # which strings the piece exposes, and test/i18n.test.ts shells out to it, so both the test
+      # suite and the standalone check need dist/ to exist first.
+      - name: Bundle
+        run: npm run bundle
+
+      - name: Test
+        run: npm test
+
+      - name: Check translations
+        run: npm run i18n:check
+
+      - name: Verify artifact
+        run: npm run verify
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: piece-tgz
+          path: artifacts/*.tgz
+          if-no-files-found: error
