@@ -23,13 +23,13 @@ jobs:
           node-version: 20
           cache: npm
 
-      # The fetched upstream tree is reproducible from .ap-pin alone, so the pin file is the whole
-      # cache key: change the pin and the cache misses, which is exactly when it should.
+      # The cached tree is whatever the fetch script produced from the pin, so the key covers both.
+      # Keying on the pin alone would hand a build the tree an older version of the script wrote.
       - name: Cache the upstream checkout
         uses: actions/cache@v4
         with:
           path: .ap-src
-          key: ap-src-${{ hashFiles('.ap-pin') }}
+          key: ap-src-${{ hashFiles('.ap-pin', 'scripts/fetch-ap.mjs') }}
 
       - name: Fetch Activepieces sources
         run: npm run ap:fetch
