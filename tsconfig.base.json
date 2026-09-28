@@ -1,0 +1,27 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2015",
+    "module": "esnext",
+    "lib": ["es2022", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@activepieces/pieces-framework": [".ap-src/packages/pieces/framework/src/index.ts"],
+      "@activepieces/pieces-common": [".ap-src/packages/pieces/common/src/index.ts"],
+      "@activepieces/core-piece-types": [".ap-src/packages/core/piece-types/src/index.ts"],
+      "@activepieces/core-utils": [".ap-src/packages/core/utils/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", ".ap-src", "artifacts"]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "orocommerce-piece-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build and CI tooling for the OroCommerce Activepieces piece. Not published; the published package is packages/orocommerce.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "ap:fetch": "node scripts/fetch-ap.mjs",
+    "bundle": "node scripts/bundle.mjs",
+    "verify": "node scripts/verify-artifact.mjs",
+    "test": "vitest run --root packages/orocommerce",
+    "lint": "eslint packages/orocommerce/src packages/orocommerce/test packages/orocommerce/tools --ext .ts,.mjs",
+    "i18n:check": "node packages/orocommerce/tools/check-i18n.mjs"
+  },
+  "devDependencies": {
+    "@activepieces/cli": "1.3.0",
+    "@typescript-eslint/eslint-plugin": "7.18.0",
+    "@typescript-eslint/parser": "7.18.0",
+    "ai": "6.0.170",
+    "deepmerge-ts": "8.0.2",
+    "esbuild": "0.28.1",
+    "eslint": "8.57.0",
+    "eslint-plugin-unused-imports": "4.4.1",
+    "form-data": "4.0.6",
+    "ipaddr.js": "2.3.0",
+    "nanoid": "3.3.18",
+    "semver": "7.6.0",
+    "tslib": "2.6.2",
+    "typescript": "5.5.4",
+    "vitest": "3.2.6",
+    "zod": "4.3.6"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
+}

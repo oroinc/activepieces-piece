@@ -11,11 +11,11 @@
     "json-api"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/oroinc/activepieces/tree/main/packages/pieces/community/orocommerce#readme",
+  "homepage": "https://github.com/oroinc/activepieces-piece/tree/main/packages/orocommerce#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oroinc/activepieces.git",
-    "directory": "packages/pieces/community/orocommerce"
+    "url": "git+https://github.com/oroinc/activepieces-piece.git",
+    "directory": "packages/orocommerce"
   },
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -26,16 +26,11 @@
     "@activepieces/core-utils": "workspace:*"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.lib.json && cp package.json dist/",
+    "build": "node ../../scripts/bundle.mjs",
     "lint": "eslint 'src/**/*.ts' 'test/**/*.ts' 'tools/**/*.mjs'",
-    "bundle": "node ../../../../dist/packages/cli/src/index.js pieces bundle",
+    "bundle": "node ../../scripts/bundle.mjs",
     "test": "vitest run",
     "i18n:check": "node tools/check-i18n.mjs",
-    "i18n:write": "node tools/check-i18n.mjs --write",
-    "check-scope": "node tools/check-scope.mjs"
-  },
-  "devDependencies": {
-    "vitest": "3.2.6",
-    "tslib": "2.6.2"
+    "i18n:write": "node tools/check-i18n.mjs --write"
   }
 }

@@ -78,7 +78,7 @@ republished.
 
 ## Reporting issues
 
-Open an issue at <https://github.com/oroinc/activepieces/issues> with your OroCommerce version, the
+Open an issue at <https://github.com/oroinc/activepieces-piece/issues> with your OroCommerce version, the
 action or trigger involved, and the error text from the run log. Do not paste client secrets,
 tokens or customer data.
 
@@ -280,22 +280,20 @@ A rejected delivery returns `[]` with a `console.warn`: no run is created and Or
 
 ## Local development
 
+Run these from the repository root, which owns the toolchain:
+
 ```bash
-npx turbo run test  --filter=@activepieces/piece-orocommerce   # vitest, i18n gate included (builds first)
-npx turbo run lint  --filter=@activepieces/piece-orocommerce
-npx turbo run build --filter=@activepieces/piece-orocommerce   # tsc -p tsconfig.lib.json, also the type-check
-npm run check-scope                                            # nothing outside this directory changed
-npm run lint-dev                                               # repo-wide lint with auto-fix
+npm ci
+npm run ap:fetch     # sparse checkout of Activepieces at the commit in .ap-pin
+npm run lint
+npm test             # vitest, 7 suites
+npm run bundle       # bundles and packs artifacts/*.tgz
+npm run i18n:check   # reads the bundle, so run it after bundle
+npm run verify       # checks the packed artifact
 ```
 
-There is no `typecheck` script in this package, so the root `typecheck` task is a no-op here — the
-build is the type-check.
-
-Nothing in `.github/workflows/` runs these — `poc/orocommerce` is the branch proposed upstream, so
-it carries this directory and `bun.lock` and nothing else. `npm run check-scope` is what enforces
-that: it diffs `origin/main...HEAD` and fails on any file outside this package other than
-`bun.lock`. Pass `--base=origin/poc/orocommerce` to scope it to one PR, and fetch first — a stale
-base ref reports upstream's own changes as offenders.
+The root README explains the fetch, the pin and how to bump it. `.github/workflows/ci.yml` runs
+exactly the sequence above on every pull request and on every push to `main`.
 
 `test/jsonapi-roundtrip.test.ts` guards the serialize/deserialize contract above,
 `test/line-items.test.ts` guards line-item validation, `test/body-utils.test.ts` guards the
@@ -317,10 +315,10 @@ no trailing newline; `i18n:write` rewrites all six files and does. Prefer `i18n:
 one that keeps the locale files in step with the source.
 
 `npm run i18n:check` (`tools/check-i18n.mjs`) fails when they drift, and `test/i18n.test.ts` runs it
-as part of the suite so the root `test` task covers it without a task of its own in the root
-`turbo.json`. It imports the **built** piece from `dist/` and only checks that the file exists, never
-that it is current — run it through turbo (`npx turbo run test`), which builds first. It walks the same 19 metadata paths as
-`pieceTranslation.pathsToValuesToTranslate` in `packages/pieces/framework/src/lib/i18n.ts`, and
+as part of the suite, so `npm test` covers it. It imports the **built** piece from `dist/` and only
+checks that the file exists, never that it is current, so run `npm run bundle` before it. It walks
+the same 19 metadata paths as `pieceTranslation.pathsToValuesToTranslate` in
+`packages/pieces/framework/src/lib/i18n.ts` in the fetched tree, and
 truncates keys at 512 characters exactly as the official generator does. It fails on keys missing
 from or stale in `translation.json`, on any locale file whose key set differs from it, and on empty
 values. Values identical to the English source are a warning; `--strict-untranslated` promotes them
