@@ -1,5 +1,5 @@
 {
-  "name": "@activepieces/piece-orocommerce",
+  "name": "@oroinc/piece-orocommerce",
   "version": "1.0.0",
   "description": "Activepieces piece for the OroCommerce back-office JSON:API: create and update customers, customer users, back-office users, orders and invoices, and trigger flows from OroCommerce webhooks.",
   "keywords": [
