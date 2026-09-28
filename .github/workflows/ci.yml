@@ -46,6 +46,11 @@ jobs:
       - name: Bundle
         run: npm run bundle
 
+      # Runs after the bundle so it also covers anything the bundler wrote. Whatever is in the
+      # fetched tree is inlined into the artifact, so the tree has to stay as upstream published it.
+      - name: Check the upstream tree is unmodified
+        run: npm run ap:check-clean
+
       - name: Test
         run: npm test
 

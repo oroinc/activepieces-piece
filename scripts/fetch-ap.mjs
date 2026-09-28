@@ -11,14 +11,13 @@
  * sources find the root node_modules on their own, and nothing has to be installed inside .ap-src.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PIN_FILE = join(REPO_ROOT, '.ap-pin');
 const SRC_DIR = join(REPO_ROOT, '.ap-src');
-const STAMP_FILE = join(SRC_DIR, '.ap-pin-stamp');
 const UPSTREAM = 'https://github.com/activepieces/activepieces.git';
 
 /** The only paths the bundler and the tests reach. Cone mode adds the root-level files for free. */
@@ -51,14 +50,23 @@ function git(args, cwd) {
   }
 }
 
-export function currentStamp() {
-  return existsSync(STAMP_FILE) ? readFileSync(STAMP_FILE, 'utf8').trim() : null;
+/**
+ * The commit the checkout currently sits on, or null if there is no usable checkout.
+ *
+ * Read from git rather than from a marker file this script writes, so that nothing here ever adds a
+ * file inside .ap-src. The tree has to stay exactly as upstream published it, both so the build is
+ * honest about what it compiled against and so scripts/check-ap-clean.mjs can assert it.
+ */
+export function currentCommit() {
+  if (!existsSync(join(SRC_DIR, '.git'))) return null;
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: SRC_DIR, encoding: 'utf8' });
+  return result.status === 0 ? result.stdout.trim() : null;
 }
 
 export function fetchUpstream({ force = false } = {}) {
   const pin = readPin();
 
-  if (!force && currentStamp() === pin) {
+  if (!force && currentCommit() === pin) {
     console.log(`.ap-src already at ${pin}, nothing to fetch.`);
     return { dir: SRC_DIR, pin, fetched: false };
   }
@@ -95,7 +103,6 @@ export function fetchUpstream({ force = false } = {}) {
     );
   }
 
-  writeFileSync(STAMP_FILE, `${pin}\n`);
   console.log(`.ap-src ready at ${pin}`);
   return { dir: SRC_DIR, pin, fetched: true };
 }
