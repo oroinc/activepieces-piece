@@ -1,0 +1,6 @@
+node_modules/
+.ap-src/
+artifacts/
+packages/orocommerce/dist/
+*.tgz
+.DS_Store
