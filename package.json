@@ -11,6 +11,8 @@
     "ap:fetch": "node scripts/fetch-ap.mjs",
     "bundle": "node scripts/bundle.mjs",
     "verify": "node scripts/verify-artifact.mjs",
+    "metadata:check": "node scripts/metadata-snapshot.mjs",
+    "metadata:write": "node scripts/metadata-snapshot.mjs --write",
     "test": "vitest run --root packages/orocommerce",
     "lint": "eslint packages/orocommerce/src packages/orocommerce/test packages/orocommerce/tools --ext .ts,.mjs",
     "i18n:check": "node packages/orocommerce/tools/check-i18n.mjs"
