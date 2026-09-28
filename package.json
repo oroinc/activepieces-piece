@@ -9,6 +9,7 @@
   },
   "scripts": {
     "ap:fetch": "node scripts/fetch-ap.mjs",
+    "ap:check-clean": "node scripts/check-ap-clean.mjs",
     "bundle": "node scripts/bundle.mjs",
     "verify": "node scripts/verify-artifact.mjs",
     "metadata:check": "node scripts/metadata-snapshot.mjs",
