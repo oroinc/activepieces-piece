@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACTS_DIR = join(REPO_ROOT, 'artifacts');
 
-const EXPECTED_NAME = '@activepieces/piece-orocommerce';
+const EXPECTED_NAME = '@oroinc/piece-orocommerce';
 const EXPECTED_MAIN = './src/index.js';
 const EXPECTED_ACTIONS = 11;
 const EXPECTED_TRIGGERS = ['oro-webhook-event'];
