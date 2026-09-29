@@ -4,7 +4,7 @@ The package follows semantic versioning https://semver.org/.
 
 ## 1.0.0
 
-* First release of the OroCommerce piece under `@oroinc/piece-orocommerce`.
+* BAP-23210: First release of the OroCommerce piece under `@oroinc/piece-orocommerce`.
 * Actions: Create Customer, Update Customer, Create Customer User, Update Customer User, Create User, Update User, Create Order, Create Invoice, Custom API Call, Serialize JSON:API Request, Unserialize JSON:API Response.
 * Trigger: Oro Webhook Event, with signed deliveries on by default.
 * Requires Activepieces 0.92.0 or later.

@@ -109,7 +109,7 @@ function main() {
     );
 
     // The README is the npm page: without it npmjs.com shows the package with no description at
-    // all, which is how 1.0.0 first went out.
+    // all, which is how the first v1.0.0 build was packed.
     check('README.md ships in the package', existsSync(join(pkgDir, 'README.md')));
 
     // The repository's other documents are for people working in it, not for anyone installing the

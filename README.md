@@ -205,30 +205,27 @@ Publishing is off. Until it is switched on, a tag produces a GitHub release with
 and nothing else, which is a complete way to ship the piece: Activepieces installs a piece from a
 packed tarball.
 
-To switch it on, in the repository settings:
-
-- set the Actions **variable** `NPM_PUBLISH_ENABLED` to `true`;
-- add the Actions **secret** `NPM_TOKEN`, an npm granular access token with publish rights on the
-  `@oroinc` scope.
+No npm token is stored in this repository. A trusted publisher can only be configured in the
+settings of a package that already exists on npm, and this package is not on npm yet
+([npm docs](https://docs.npmjs.com/trusted-publishers/), [npm/cli#8544](https://github.com/npm/cli/issues/8544)),
+so 1.0.0 is published once by hand by an `@oroinc` npm maintainer, from the `.tgz` attached to its
+GitHub release. Trusted publishing is configured on the package after that, and from the next version
+a tag publishes by itself once a repository admin sets the Actions variable `NPM_PUBLISH_ENABLED` to
+`true`. [MAINTAINERS.md](MAINTAINERS.md#who-can-publish) has the steps and who does them.
 
 The publish step runs `npm publish --provenance --access public` on the exact `.tgz` the release
 carries, and it asks npm for the version first: if `@oroinc/piece-orocommerce@<version>` is already
-there, it skips.
-
-The token is a first-publish measure, not the end state. npm's trusted publishing (OIDC) removes the
-long-lived token, but a trusted publisher can only be configured in the settings of a package that
-already exists on npm, and this package is not on npm yet
-([npm docs](https://docs.npmjs.com/trusted-publishers/), [npm/cli#8544](https://github.com/npm/cli/issues/8544)).
-So the first release goes out with `NPM_TOKEN`; after it lands, configure GitHub Actions as a trusted
-publisher on the package page and delete the secret. Nothing in the workflow has to change for that:
-with trusted publishing, npm authenticates the run through the `id-token` permission the job already
-has.
+there, it skips. Nothing in the workflow has to change for trusted publishing: npm authenticates the
+run through the `id-token` permission the job already has, given a new enough npm on the runner.
 
 #### A published version is final
 
-A version that has been released is never rebuilt and never republished. Re-running the workflow on
-an existing tag changes nothing, and moving a tag does not move what was published. If a release is
-wrong, the fix is the next version.
+Published means on npm. A version that reached npm is never rebuilt and never republished:
+re-running the workflow on an existing tag changes nothing, and moving a tag does not move what npm
+already has. If a published version is wrong, the fix is the next version.
+
+A GitHub release of a version that never reached npm is not final in that sense and may be deleted
+and cut again; see [MAINTAINERS.md](MAINTAINERS.md#how-a-release-happens).
 
 ### Layout
 
