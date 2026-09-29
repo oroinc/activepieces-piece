@@ -13,6 +13,9 @@
   ],
   "author": "Oro, Inc. (https://oroinc.com)",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "homepage": "https://github.com/oroinc/activepieces-piece/tree/main/packages/orocommerce#readme",
   "repository": {
     "type": "git",
