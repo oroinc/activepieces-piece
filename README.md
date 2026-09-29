@@ -241,11 +241,30 @@ scripts/verify-artifact.mjs  checks on the packed .tgz
 scripts/metadata-snapshot.mjs  compares the built surface with the committed snapshot
 scripts/check-ap-clean.mjs   asserts .ap-src is unmodified at the pinned commit
 scripts/release-notes.mjs    the release identity written into the release notes
+scripts/notices.mjs          builds the NOTICE that ships in the package
+scripts/esbuild-metafile.cjs  makes the bundler hand back its metafile
+LICENSE                    the licence, copied into the package at build time
 .github/actions/build-piece  the build and the checks, shared by CI and the release workflow
 .github/workflows/           CI on every pull request, release on every v*.*.* tag
 packages/orocommerce/      the piece, and the package that is published
 packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
 ```
+
+## Licence
+
+The piece is MIT; see [LICENSE](LICENSE).
+
+Most of what the published artifact contains is not written here. The bundler inlines the
+Activepieces framework and every npm package the piece reaches into a single `src/index.js`, and
+every licence involved requires its notice to travel with the code, so the packed `.tgz` carries a
+`NOTICE` listing each of them with its full licence text.
+
+That file is generated on every build from the bundler's own metafile, counting only packages that
+contribute code to the bundle, so it describes the artifact rather than the dependency list. There
+is no copy in the repository, because there is nothing to generate it from until a build has run.
+`npm run bundle` writes it, `npm run verify` fails if it is missing or does not name everything
+bundled, and a package under a licence the generator has no rule for fails the build by name rather
+than shipping unattributed.
 
 ## Reporting problems
 
