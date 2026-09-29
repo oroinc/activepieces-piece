@@ -103,14 +103,8 @@ export function bundle() {
   cpSync(builtDist, localDist, { recursive: true });
 
   console.log('Writing README, LICENSE and NOTICE into the package');
-  // npm packs from dist, so anything that has to ship has to be put there. The README is the npm
-  // page and is the only document that ships; the licence is this repository's own; the notice
-  // covers everything inlined into the bundle and is generated from the metafile, so a pin bump
-  // that pulls in a new package updates it or fails the build.
-  //
-  // CHANGELOG.md and MAINTAINERS.md are deliberately not copied. The files list the bundler writes
-  // is an allow-list, so it does the job Oro's other published packages give an .npmignore, and
-  // there is nothing here for an .npmignore to exclude: only what is copied into dist can ship.
+  // README, LICENSE and NOTICE ship; other docs stay out because only what is copied into dist is
+  // packed.
   const packages = bundledPackages(JSON.parse(readFileSync(metafilePath, 'utf8')));
   const manifest = JSON.parse(readFileSync(join(localDist, 'package.json'), 'utf8'));
   const notice = buildNotice({
@@ -123,9 +117,7 @@ export function bundle() {
   cpSync(LICENCE_FILE, join(localDist, 'LICENSE'));
   writeFileSync(join(localDist, 'NOTICE'), notice);
   // The bundler rewrites the manifest with a files allow-list. npm force-includes README.md and
-  // LICENSE whatever that list says, but not NOTICE, so without this the notice is written and then
-  // dropped on pack. README.md is listed anyway: it is the npm page, and stating it here means the
-  // package does not depend on that force-include staying npm's behaviour.
+  // LICENSE whatever that list says, but not NOTICE, so all three are listed here.
   if (Array.isArray(manifest.files) && !manifest.files.includes('NOTICE')) {
     manifest.files = [...manifest.files, 'README.md', 'LICENSE', 'NOTICE'];
     writeFileSync(join(localDist, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);

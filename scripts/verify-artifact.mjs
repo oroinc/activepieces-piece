@@ -108,17 +108,8 @@ function main() {
       JSON.stringify(manifest.dependencies)
     );
 
-    // The README is the npm page: without it npmjs.com shows the package with no description at
-    // all, which is how the first v1.0.0 build was packed.
+    // README.md must ship; no other .md may.
     check('README.md ships in the package', existsSync(join(pkgDir, 'README.md')));
-
-    // The repository's other documents - the changelog, the architecture notes, whatever gets
-    // written next to them later - are for people working in this repository, not for anyone
-    // installing the package, and they are what Oro's other published packages keep out with an
-    // .npmignore. Here the manifest's files list is an allow-list and the package is packed from
-    // dist, so they stay out by not being copied there. Checked as a rule rather than by name,
-    // because the risk is a document nobody thought to list: bundle.mjs copies README.md out of a
-    // directory that holds the others, and a copy widened to that directory would sweep them in.
     const strayDocs = readdirSync(pkgDir).filter((f) => f.endsWith('.md') && f !== 'README.md');
     check(
       'no document other than README.md ships',

@@ -61,16 +61,8 @@ is `packages/orocommerce`, and its `package.json` is the published manifest.
 Every pull request is reviewed. `.github/CODEOWNERS` names two front-end owners and GitHub requests
 a review from both; whichever of the two did not write the change is the one who reviews it.
 
-Two documents carry the rest, and this one does not repeat them:
-
-- **[MAINTAINERS.md](MAINTAINERS.md)** - who maintains the repository, how to build and test it, how
-  a release is cut and who can publish.
-- **[packages/orocommerce/ARCHITECTURE.md](packages/orocommerce/ARCHITECTURE.md)** - how the piece is
-  built and why. Read the relevant section before changing anything under
-  `packages/orocommerce/src/`.
-
-What stays here is what neither of those explains: why the build fetches Activepieces at all, and the
-pin that decides which version it fetches.
+Build, test and release: [MAINTAINERS.md](MAINTAINERS.md). Code notes:
+[packages/orocommerce/ARCHITECTURE.md](packages/orocommerce/ARCHITECTURE.md).
 
 ### Why the build fetches Activepieces
 
@@ -114,10 +106,8 @@ Raise the bump as **its own pull request**, changing `.ap-pin` and nothing else,
 on the artifact is visible on its own.
 
 Maintainers set the pin to the upstream commit of the Activepieces version Oro runs, and never below
-0.92.0, which is the oldest version Oro supports the piece on. Note that the piece's own
-`minimumSupportedRelease` is lower, so Activepieces does not enforce that floor; raising it is a
-change to the piece's surface and belongs in its own pull request. Whatever the source, what lands
-in `.ap-pin` is always a full upstream commit sha.
+0.92.0, which is the oldest version this piece supports. Whatever the source, what lands in `.ap-pin`
+is always a full upstream commit sha.
 
 Expect a bump to change the artifact. The framework and the common package are inlined into the
 bundle, so their contents move its size and its hash, and a changed label in the shared HTTP action
@@ -129,14 +119,11 @@ to 0.92.0 did exactly that: seven props of the custom API call action changed ty
 flag. `packages/orocommerce/metadata.snapshot.json` records the piece's surface and CI fails when the
 build no longer matches it, so run `npm run metadata:write` in the bump's own pull request and read
 what lands in the diff. Treat a changed property type or a required field becoming optional as a
-change to flows people have already built, and see
-[MAINTAINERS.md](MAINTAINERS.md#how-a-release-happens) for which version bump that deserves.
+change to flows people have already built.
 
 ### Releasing
 
-A release is one tag on `main`, and the workflow builds and publishes what that tag points at.
-The version rule, the CHANGELOG entry, the tagging steps and who publishes to npm are in
-[MAINTAINERS.md](MAINTAINERS.md#how-a-release-happens).
+See [MAINTAINERS.md](MAINTAINERS.md#release).
 
 ### Layout
 
@@ -153,11 +140,11 @@ scripts/release-notes.mjs    the release identity written into the release notes
 scripts/notices.mjs          builds the NOTICE that ships in the package
 scripts/esbuild-metafile.cjs  makes the bundler hand back its metafile
 LICENSE                    the licence, copied into the package at build time
-MAINTAINERS.md             who maintains this, how to build it, how a release is cut
+MAINTAINERS.md             maintainers, build, release
 .github/actions/build-piece  the build and the checks, shared by CI and the release workflow
 .github/workflows/           CI on every pull request, release on every v*.*.* tag
 packages/orocommerce/      the piece, and the package that is published
-packages/orocommerce/README.md   the npm page; the only document that ships in the package
+packages/orocommerce/README.md   the npm page; the only document that ships
 packages/orocommerce/CHANGELOG.md  what changed in each version
 packages/orocommerce/ARCHITECTURE.md  how the piece is built and why
 packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
