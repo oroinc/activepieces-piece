@@ -1,0 +1,1611 @@
+{
+  "piece": {
+    "displayName": "OroCommerce",
+    "description": "B2B digital commerce solution",
+    "minimumSupportedRelease": "0.86.0",
+    "maximumSupportedRelease": null,
+    "categories": [
+      "COMMERCE"
+    ],
+    "authors": [
+      "Oro Inc."
+    ]
+  },
+  "auth": {
+    "type": "CUSTOM_AUTH",
+    "required": true,
+    "props": {
+      "adminPrefix": {
+        "type": "SHORT_TEXT",
+        "displayName": "Admin Prefix",
+        "description": "The admin panel URL prefix (default is \"admin\").",
+        "required": true,
+        "defaultValue": "admin"
+      },
+      "clientId": {
+        "type": "SHORT_TEXT",
+        "displayName": "Client ID",
+        "description": "The OAuth Client ID from your OroCommerce OAuth application.",
+        "required": true,
+        "defaultValue": null
+      },
+      "clientSecret": {
+        "type": "SECRET_TEXT",
+        "displayName": "Client Secret",
+        "description": "The OAuth Client Secret from your OroCommerce OAuth application.",
+        "required": true,
+        "defaultValue": null
+      },
+      "headers": {
+        "type": "LONG_TEXT",
+        "displayName": "Default HTTP Headers",
+        "description": "JSON object of HTTP headers sent with every action. A header set on the step wins; Authorization is always managed by this connection.",
+        "required": false,
+        "defaultValue": null
+      },
+      "isInternalInfrastructure": {
+        "type": "CHECKBOX",
+        "displayName": "Internal infrastructure",
+        "description": "Setting this option allows to rewrite network-related connection options with values provied in ENV variables.",
+        "required": true,
+        "defaultValue": false
+      },
+      "serverUrl": {
+        "type": "SHORT_TEXT",
+        "displayName": "Server URL",
+        "description": "The base URL of your OroCommerce instance (e.g., https://your-store.com).",
+        "required": true,
+        "defaultValue": null
+      }
+    }
+  },
+  "actions": {
+    "create_customer": {
+      "displayName": "Create Customer",
+      "description": "Creates a new customer (company) record in OroCommerce.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "addresses": {
+          "type": "ARRAY",
+          "displayName": "Addresses",
+          "description": "Customer addresses to create along with the customer.",
+          "required": false,
+          "defaultValue": null
+        },
+        "externalId": {
+          "type": "SHORT_TEXT",
+          "displayName": "External ID",
+          "description": "A unique identifier from an external system.",
+          "required": false,
+          "defaultValue": null
+        },
+        "group": {
+          "type": "DROPDOWN",
+          "displayName": "Customer Group",
+          "description": "Search customer groups.",
+          "required": false,
+          "defaultValue": null
+        },
+        "internalRating": {
+          "type": "DROPDOWN",
+          "displayName": "Internal Rating",
+          "description": "Internal customer rating (e.g. \"1 of 5\", \"5 of 5\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "name": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name",
+          "description": "A human-readable name that identifies the customer (company).",
+          "required": true,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner",
+          "description": "The back-office user who owns this record. Search by name, username or email.",
+          "required": false,
+          "defaultValue": null
+        },
+        "parent": {
+          "type": "DROPDOWN",
+          "displayName": "Parent Customer",
+          "description": "The parent company this customer (division) reports to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "paymentTerm": {
+          "type": "DROPDOWN",
+          "displayName": "Payment Term",
+          "description": "Search payment terms.",
+          "required": false,
+          "defaultValue": null
+        },
+        "taxCode": {
+          "type": "DROPDOWN",
+          "displayName": "Tax Code",
+          "description": "Search customer tax codes.",
+          "required": false,
+          "defaultValue": null
+        },
+        "vat_id": {
+          "type": "SHORT_TEXT",
+          "displayName": "VAT ID",
+          "description": "Customer's value added tax identification number.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "create_customer_user": {
+      "displayName": "Create Customer User",
+      "description": "Creates a new customer user (storefront account) in OroCommerce.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "addresses": {
+          "type": "ARRAY",
+          "displayName": "Addresses",
+          "description": "Customer user addresses to create along with the user.",
+          "required": false,
+          "defaultValue": null
+        },
+        "birthday": {
+          "type": "SHORT_TEXT",
+          "displayName": "Birthday",
+          "description": "Birth date in YYYY-MM-DD format.",
+          "required": false,
+          "defaultValue": null
+        },
+        "confirmed": {
+          "type": "CHECKBOX",
+          "displayName": "Confirmed",
+          "description": "Marks the account confirmed without sending a confirmation email. Defaults to true.",
+          "required": false,
+          "defaultValue": true
+        },
+        "customer": {
+          "type": "DROPDOWN",
+          "displayName": "Customer",
+          "description": "The customer this order belongs to.",
+          "required": true,
+          "defaultValue": null
+        },
+        "email": {
+          "type": "SHORT_TEXT",
+          "displayName": "Email",
+          "description": "Email address of the customer user. Used as the login.",
+          "required": true,
+          "defaultValue": null
+        },
+        "enabled": {
+          "type": "CHECKBOX",
+          "displayName": "Enabled",
+          "description": "When disabled the user cannot log into the storefront. Defaults to true, so the account is active as soon as it is created.",
+          "required": false,
+          "defaultValue": true
+        },
+        "externalId": {
+          "type": "SHORT_TEXT",
+          "displayName": "External ID",
+          "description": "A unique identifier from an external system.",
+          "required": false,
+          "defaultValue": null
+        },
+        "firstName": {
+          "type": "SHORT_TEXT",
+          "displayName": "First Name",
+          "description": null,
+          "required": true,
+          "defaultValue": null
+        },
+        "lastName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Last Name",
+          "description": null,
+          "required": true,
+          "defaultValue": null
+        },
+        "middleName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Middle Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "namePrefix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Prefix",
+          "description": "Honorific (e.g. Mr., Ms., Dr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "nameSuffix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Suffix",
+          "description": "Suffix (e.g. PhD, Jr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner",
+          "description": "The back-office user who owns this record. Search by name, username or email.",
+          "required": false,
+          "defaultValue": null
+        },
+        "password": {
+          "type": "SHORT_TEXT",
+          "displayName": "Password",
+          "description": "Password for the new account. Prefer a value from a secret store over a literal one.",
+          "required": true,
+          "defaultValue": null
+        },
+        "userRoles": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "Roles (replaces all existing roles)",
+          "description": "The complete set of customer user roles. Saving replaces the existing roles, so include every role the customer user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "website": {
+          "type": "DROPDOWN",
+          "displayName": "Website",
+          "description": "The website this record is associated with.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "create_invoice": {
+      "displayName": "Create Invoice",
+      "description": "Creates a new invoice record in OroCommerce.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "billTo": {
+          "type": "LONG_TEXT",
+          "displayName": "Bill To",
+          "description": "Billing address HTML string (e.g. <strong>123 Main St</strong>, City, Country).",
+          "required": false,
+          "defaultValue": null
+        },
+        "currency": {
+          "type": "SHORT_TEXT",
+          "displayName": "Currency",
+          "description": "ISO-4217 3-letter currency code (e.g. USD, EUR).",
+          "required": true,
+          "defaultValue": "USD"
+        },
+        "customer": {
+          "type": "DROPDOWN",
+          "displayName": "Customer",
+          "description": "Select a customer.",
+          "required": false,
+          "defaultValue": null
+        },
+        "customerName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Customer Name",
+          "description": "Name of the company being billed. Stored as a plain-text label on the invoice.",
+          "required": true,
+          "defaultValue": null
+        },
+        "customerUser": {
+          "type": "DROPDOWN",
+          "displayName": "Customer User",
+          "description": "Select a Customer User.",
+          "required": false,
+          "defaultValue": null
+        },
+        "description": {
+          "type": "LONG_TEXT",
+          "displayName": "Description",
+          "description": "Internal description of the invoice.",
+          "required": false,
+          "defaultValue": null
+        },
+        "externalPaymentUrl": {
+          "type": "SHORT_TEXT",
+          "displayName": "External Payment URL",
+          "description": "URL for the external payment page.",
+          "required": false,
+          "defaultValue": null
+        },
+        "internalStatus": {
+          "type": "DROPDOWN",
+          "displayName": "Internal Status",
+          "description": "Invoice internal status (e.g. Draft, Open).",
+          "required": false,
+          "defaultValue": null
+        },
+        "invoiceDate": {
+          "type": "SHORT_TEXT",
+          "displayName": "Invoice Date",
+          "description": "Invoice date in YYYY-MM-DD format.",
+          "required": true,
+          "defaultValue": null
+        },
+        "invoiceNumber": {
+          "type": "SHORT_TEXT",
+          "displayName": "Invoice Number",
+          "description": "Sequential invoice number (e.g. INV-2026-00001). Auto-generated if left empty.",
+          "required": false,
+          "defaultValue": null
+        },
+        "invoicePdfContent": {
+          "type": "LONG_TEXT",
+          "displayName": "Invoice PDF (Base64)",
+          "description": "Base64-encoded PDF, with or without a data: prefix. Attached to the invoice as its default PDF.",
+          "required": false,
+          "defaultValue": null
+        },
+        "invoicePdfFilename": {
+          "type": "SHORT_TEXT",
+          "displayName": "Invoice PDF Filename",
+          "description": "Filename for the attached PDF. Defaults to invoice.pdf.",
+          "required": false,
+          "defaultValue": null
+        },
+        "lineItems": {
+          "type": "DYNAMIC",
+          "displayName": "Line Items",
+          "description": "Invoice line items. Each item is sent via JSON:API included.",
+          "required": true,
+          "defaultValue": null
+        },
+        "memo": {
+          "type": "SHORT_TEXT",
+          "displayName": "Memo",
+          "description": "Short memo visible on the invoice (e.g. \"Thank you!\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner",
+          "description": "The back-office user who owns this record. Search by name, username or email.",
+          "required": false,
+          "defaultValue": null
+        },
+        "refCustomerId": {
+          "type": "NUMBER",
+          "displayName": "External Customer ID",
+          "description": "An optional ID reference to a customer. Can be used for storing an arbitrary external ID.",
+          "required": false,
+          "defaultValue": null
+        },
+        "refCustomerUserId": {
+          "type": "NUMBER",
+          "displayName": "External Customer User ID",
+          "description": "An optional ID reference to a customer user. Can be used for storing an arbitrary external ID.",
+          "required": false,
+          "defaultValue": null
+        },
+        "sellerInfo": {
+          "type": "LONG_TEXT",
+          "displayName": "Seller Info",
+          "description": "Seller contact / address HTML string.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shipTo": {
+          "type": "LONG_TEXT",
+          "displayName": "Ship To",
+          "description": "Shipping address HTML string.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingMethod": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping Method",
+          "description": "Shipping method label (e.g. \"International Shipping <em>(Tracking #: 123)</em>\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "title": {
+          "type": "SHORT_TEXT",
+          "displayName": "Title",
+          "description": "Alternative invoice title that reflects its nature.",
+          "required": false,
+          "defaultValue": null
+        },
+        "totalAmount": {
+          "type": "NUMBER",
+          "displayName": "Total Amount",
+          "description": "Total invoice amount. Should equal the sum of all line item row totals.",
+          "required": true,
+          "defaultValue": null
+        },
+        "website": {
+          "type": "DROPDOWN",
+          "displayName": "Website",
+          "description": "The website this record is associated with.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "create_order": {
+      "displayName": "Create Order",
+      "description": "Creates a new order record in OroCommerce.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressCity": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: City",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressCountry": {
+          "type": "DROPDOWN",
+          "displayName": "Billing: Country",
+          "description": "ISO-3166 country. Start typing to filter the list.",
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressCustomRegion": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Custom Region",
+          "description": "Free-text region for countries without predefined regions.",
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressFirstName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: First Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressLabel": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Label",
+          "description": "Address label (e.g. \"Main Office\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressLastName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Last Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressOrganization": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Organization",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressPhone": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Phone",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressPostalCode": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Postal Code",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressRegion": {
+          "type": "DROPDOWN",
+          "displayName": "Billing: Region / State",
+          "description": "Region or state. Select a country first. Start typing to filter.",
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressStreet": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Street",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "billingAddressStreet2": {
+          "type": "SHORT_TEXT",
+          "displayName": "Billing: Street 2",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "currency": {
+          "type": "SHORT_TEXT",
+          "displayName": "Currency",
+          "description": "ISO-4217 3-letter currency code (e.g. USD, EUR).",
+          "required": false,
+          "defaultValue": "USD"
+        },
+        "customer": {
+          "type": "DROPDOWN",
+          "displayName": "Customer",
+          "description": "The customer this order belongs to.",
+          "required": true,
+          "defaultValue": null
+        },
+        "customerNotes": {
+          "type": "LONG_TEXT",
+          "displayName": "Customer Notes",
+          "description": "Notes from the customer (e.g. \"Call before delivery\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "customerUser": {
+          "type": "DROPDOWN",
+          "displayName": "Customer User",
+          "description": "Select a Customer User.",
+          "required": false,
+          "defaultValue": null
+        },
+        "disablePromotions": {
+          "type": "CHECKBOX",
+          "displayName": "Disable Promotions",
+          "description": "Prevent the promotions engine from running for this order.",
+          "required": false,
+          "defaultValue": null
+        },
+        "estimatedShippingCostAmount": {
+          "type": "NUMBER",
+          "displayName": "Estimated Shipping Cost",
+          "description": "Shipping cost calculated from the selected shipping method.",
+          "required": false,
+          "defaultValue": null
+        },
+        "identifier": {
+          "type": "SHORT_TEXT",
+          "displayName": "Identifier",
+          "description": "Unique order reference (e.g. FR1012401Z).",
+          "required": false,
+          "defaultValue": null
+        },
+        "internalStatus": {
+          "type": "DROPDOWN",
+          "displayName": "Internal Status",
+          "description": "Order internal status (e.g. Open, Cancelled).",
+          "required": false,
+          "defaultValue": null
+        },
+        "lineItems": {
+          "type": "DYNAMIC",
+          "displayName": "Line Items",
+          "description": "Order line items.",
+          "required": true,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "overriddenShippingCostAmount": {
+          "type": "NUMBER",
+          "displayName": "Overridden Shipping Cost",
+          "description": "Custom shipping cost that overrides the calculated value.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner",
+          "description": "The back-office user who owns this record. Search by name, username or email.",
+          "required": false,
+          "defaultValue": null
+        },
+        "parent": {
+          "type": "DROPDOWN",
+          "displayName": "Parent Order",
+          "description": "Search orders to use as the parent order.",
+          "required": false,
+          "defaultValue": null
+        },
+        "paymentTerm": {
+          "type": "DROPDOWN",
+          "displayName": "Payment Term",
+          "description": "Search payment terms.",
+          "required": false,
+          "defaultValue": null
+        },
+        "poNumber": {
+          "type": "SHORT_TEXT",
+          "displayName": "PO Number",
+          "description": "Purchase order number provided by the buyer.",
+          "required": false,
+          "defaultValue": null
+        },
+        "productSearch": {
+          "type": "DROPDOWN",
+          "displayName": "Product",
+          "description": "Search products.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shipUntil": {
+          "type": "SHORT_TEXT",
+          "displayName": "Ship Until Date",
+          "description": "Latest acceptable ship date in YYYY-MM-DD format.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressCity": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: City",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressCountry": {
+          "type": "DROPDOWN",
+          "displayName": "Shipping: Country",
+          "description": "ISO-3166 country. Start typing to filter the list.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressCustomRegion": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Custom Region",
+          "description": "Free-text region for countries without predefined regions.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressFirstName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: First Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressLabel": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Label",
+          "description": "Address label (e.g. \"Warehouse East\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressLastName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Last Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressOrganization": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Organization",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressPhone": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Phone",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressPostalCode": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Postal Code",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressRegion": {
+          "type": "DROPDOWN",
+          "displayName": "Shipping: Region / State",
+          "description": "Region or state. Select a country first. Start typing to filter.",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressStreet": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Street",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingAddressStreet2": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping: Street 2",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingMethod": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping Method",
+          "description": "The shipping method selected for the order (e.g. \"flat_rate_2\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "shippingMethodType": {
+          "type": "SHORT_TEXT",
+          "displayName": "Shipping Method Type",
+          "description": "The shipping method type (e.g. \"primary\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "status": {
+          "type": "DROPDOWN",
+          "displayName": "Status",
+          "description": "Order status managed by an external system (only relevant when \"Enable External Status Management\" is on).",
+          "required": false,
+          "defaultValue": null
+        },
+        "warehouse": {
+          "type": "DROPDOWN",
+          "displayName": "Warehouse",
+          "description": "Search warehouses.",
+          "required": false,
+          "defaultValue": null
+        },
+        "website": {
+          "type": "DROPDOWN",
+          "displayName": "Website",
+          "description": "The website this record is associated with.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "create_user": {
+      "displayName": "Create User",
+      "description": "Creates a new back-office user in OroCommerce.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "authStatus": {
+          "type": "DROPDOWN",
+          "displayName": "Auth Status",
+          "description": "Authentication status of the user (e.g. active, reset, locked).",
+          "required": false,
+          "defaultValue": null
+        },
+        "birthday": {
+          "type": "SHORT_TEXT",
+          "displayName": "Birthday",
+          "description": "Birth date in YYYY-MM-DD format.",
+          "required": false,
+          "defaultValue": null
+        },
+        "businessUnits": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "Business Units (replaces all existing business units)",
+          "description": "The complete set of business units the user belongs to. Saving replaces the existing list, so include every business unit the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "email": {
+          "type": "SHORT_TEXT",
+          "displayName": "Email",
+          "description": "Email address of the user.",
+          "required": true,
+          "defaultValue": null
+        },
+        "enabled": {
+          "type": "CHECKBOX",
+          "displayName": "Enabled",
+          "description": "When disabled the user cannot log in. Defaults to true.",
+          "required": false,
+          "defaultValue": true
+        },
+        "firstName": {
+          "type": "SHORT_TEXT",
+          "displayName": "First Name",
+          "description": null,
+          "required": true,
+          "defaultValue": null
+        },
+        "groups": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "User Groups (replaces all existing groups)",
+          "description": "The complete set of back-office groups for the user. Saving replaces the existing groups, so include every group the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "lastName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Last Name",
+          "description": null,
+          "required": true,
+          "defaultValue": null
+        },
+        "middleName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Middle Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "namePrefix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Prefix",
+          "description": "Honorific (e.g. Mr., Ms., Dr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "nameSuffix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Suffix",
+          "description": "Suffix (e.g. PhD, Jr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "organizations": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "Organizations (replaces all existing organizations)",
+          "description": "The complete set of organizations the user has access to. Saving replaces the existing list, so include every organization the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner (Business Unit)",
+          "description": "The business unit that owns this record.",
+          "required": true,
+          "defaultValue": null
+        },
+        "password": {
+          "type": "SHORT_TEXT",
+          "displayName": "Password",
+          "description": "Password for the new account. Prefer a value from a secret store over a literal one.",
+          "required": true,
+          "defaultValue": null
+        },
+        "phone": {
+          "type": "SHORT_TEXT",
+          "displayName": "Phone",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "title": {
+          "type": "SHORT_TEXT",
+          "displayName": "Title",
+          "description": "Job title or position.",
+          "required": false,
+          "defaultValue": null
+        },
+        "userRoles": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "User Roles (replaces all existing roles)",
+          "description": "The complete set of back-office roles for the user. Saving replaces the existing roles, so include every role the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "username": {
+          "type": "SHORT_TEXT",
+          "displayName": "Username",
+          "description": "Login name for the user. Must be unique.",
+          "required": true,
+          "defaultValue": null
+        }
+      }
+    },
+    "custom_api_call": {
+      "displayName": "Custom API Call",
+      "description": "Make a direct authenticated call to the OroCommerce JSON:API.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "body": {
+          "type": "DYNAMIC",
+          "displayName": "Body",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "body_type": {
+          "type": "DROPDOWN",
+          "displayName": "Body Type",
+          "description": null,
+          "required": false,
+          "defaultValue": "none"
+        },
+        "failsafe": {
+          "type": "CHECKBOX",
+          "displayName": "Return Error as Output",
+          "description": "On a failed request, output the error instead of failing the step.",
+          "required": false,
+          "defaultValue": null
+        },
+        "followRedirects": {
+          "type": "CHECKBOX",
+          "displayName": "Follow redirects",
+          "description": "Follow 3xx redirects instead of returning them as the response.",
+          "required": false,
+          "defaultValue": false
+        },
+        "headers": {
+          "type": "OBJECT",
+          "displayName": "Headers",
+          "description": "Authorization headers are injected automatically from your connection.",
+          "required": false,
+          "defaultValue": null
+        },
+        "method": {
+          "type": "STATIC_DROPDOWN",
+          "displayName": "Method",
+          "description": null,
+          "required": true,
+          "defaultValue": "GET"
+        },
+        "queryParams": {
+          "type": "OBJECT",
+          "displayName": "Query Parameters",
+          "description": "Appended to the URL as ?key=value.",
+          "required": false,
+          "defaultValue": null
+        },
+        "response_is_binary": {
+          "type": "CHECKBOX",
+          "displayName": "Response is Binary",
+          "description": "Enable for files like PDFs, images, etc.",
+          "required": false,
+          "defaultValue": false
+        },
+        "timeout": {
+          "type": "NUMBER",
+          "displayName": "Timeout",
+          "description": "Seconds to wait for a response. Empty: up to the flow limit (10 min).",
+          "required": false,
+          "defaultValue": null
+        },
+        "url": {
+          "type": "DYNAMIC",
+          "displayName": "",
+          "description": null,
+          "required": true,
+          "defaultValue": null
+        }
+      }
+    },
+    "serialize_jsonapi": {
+      "displayName": "Serialize JSON:API Request",
+      "description": "Builds a JSON:API request body from a plain object, ready for the Request Body of the API Call action.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "attributes": {
+          "type": "JSON",
+          "displayName": "Attributes",
+          "description": "A flat object, Unserialize output, or a single-resource JSON:API document. Values marked with _type or shaped like {\"type\",\"id\"} become relationships.",
+          "required": true,
+          "defaultValue": null
+        },
+        "included": {
+          "type": "JSON",
+          "displayName": "Included",
+          "description": "Extra resources to embed. Forwarded automatically when Attributes already has \"included\".",
+          "required": false,
+          "defaultValue": []
+        },
+        "relationships": {
+          "type": "JSON",
+          "displayName": "Relationships (override)",
+          "description": "Wins over anything detected in Attributes. Example: {\"customer\":{\"type\":\"customers\",\"id\":\"42\"}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "resourceId": {
+          "type": "SHORT_TEXT",
+          "displayName": "Resource ID",
+          "description": "Leave empty to create a record, or when the input carries an id.",
+          "required": false,
+          "defaultValue": null
+        },
+        "resourceType": {
+          "type": "SHORT_TEXT",
+          "displayName": "Resource Type",
+          "description": "e.g. orders, invoices, products. Taken from _type when left empty.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "unserialize_jsonapi": {
+      "displayName": "Unserialize JSON:API Response",
+      "description": "Flattens a JSON:API response body into a plain object. Included relationships are inlined, and the result stays re-serializable.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "response": {
+          "type": "JSON",
+          "displayName": "JSON:API Response",
+          "description": "The \"body\" output of the API Call action. Needs a top-level \"data\" key.",
+          "required": true,
+          "defaultValue": null
+        }
+      }
+    },
+    "update_customer": {
+      "displayName": "Update Customer",
+      "description": "Updates an existing customer (company) record in OroCommerce. Only provided fields are changed.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "customerId": {
+          "type": "SHORT_TEXT",
+          "displayName": "Customer ID",
+          "description": "The numeric ID of the customer to update.",
+          "required": true,
+          "defaultValue": null
+        },
+        "externalId": {
+          "type": "SHORT_TEXT",
+          "displayName": "External ID",
+          "description": "A unique identifier from an external system.",
+          "required": false,
+          "defaultValue": null
+        },
+        "group": {
+          "type": "DROPDOWN",
+          "displayName": "Customer Group",
+          "description": "Search customer groups.",
+          "required": false,
+          "defaultValue": null
+        },
+        "internalRating": {
+          "type": "DROPDOWN",
+          "displayName": "Internal Rating",
+          "description": "Internal customer rating (e.g. \"1 of 5\", \"5 of 5\").",
+          "required": false,
+          "defaultValue": null
+        },
+        "name": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name",
+          "description": "A human-readable name that identifies the customer (company).",
+          "required": false,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner",
+          "description": "The back-office user who owns this record. Search by name, username or email.",
+          "required": false,
+          "defaultValue": null
+        },
+        "parent": {
+          "type": "DROPDOWN",
+          "displayName": "Parent Customer",
+          "description": "The parent company this customer (division) reports to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "paymentTerm": {
+          "type": "DROPDOWN",
+          "displayName": "Payment Term",
+          "description": "Search payment terms.",
+          "required": false,
+          "defaultValue": null
+        },
+        "taxCode": {
+          "type": "DROPDOWN",
+          "displayName": "Tax Code",
+          "description": "Search customer tax codes.",
+          "required": false,
+          "defaultValue": null
+        },
+        "vat_id": {
+          "type": "SHORT_TEXT",
+          "displayName": "VAT ID",
+          "description": "Customer's value added tax identification number.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "update_customer_user": {
+      "displayName": "Update Customer User",
+      "description": "Updates an existing customer user (storefront account) in OroCommerce. Only provided fields are changed.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "birthday": {
+          "type": "SHORT_TEXT",
+          "displayName": "Birthday",
+          "description": "Birth date in YYYY-MM-DD format.",
+          "required": false,
+          "defaultValue": null
+        },
+        "confirmed": {
+          "type": "STATIC_DROPDOWN",
+          "displayName": "Confirmed",
+          "description": "Whether the user has completed email confirmation.",
+          "required": false,
+          "defaultValue": "unchanged"
+        },
+        "customer": {
+          "type": "DROPDOWN",
+          "displayName": "Customer",
+          "description": "Select a customer.",
+          "required": false,
+          "defaultValue": null
+        },
+        "customerUserId": {
+          "type": "SHORT_TEXT",
+          "displayName": "Customer User ID",
+          "description": "The numeric ID of the customer user to update.",
+          "required": true,
+          "defaultValue": null
+        },
+        "email": {
+          "type": "SHORT_TEXT",
+          "displayName": "Email",
+          "description": "Updated email address of the customer user.",
+          "required": false,
+          "defaultValue": null
+        },
+        "enabled": {
+          "type": "STATIC_DROPDOWN",
+          "displayName": "Enabled",
+          "description": "Enable or disable the storefront account.",
+          "required": false,
+          "defaultValue": "unchanged"
+        },
+        "externalId": {
+          "type": "SHORT_TEXT",
+          "displayName": "External ID",
+          "description": "A unique identifier from an external system.",
+          "required": false,
+          "defaultValue": null
+        },
+        "firstName": {
+          "type": "SHORT_TEXT",
+          "displayName": "First Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "lastName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Last Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "middleName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Middle Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "namePrefix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Prefix",
+          "description": "Honorific (e.g. Mr., Ms., Dr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "nameSuffix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Suffix",
+          "description": "Suffix (e.g. PhD, Jr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Owner",
+          "description": "The back-office user who owns this record. Search by name, username or email.",
+          "required": false,
+          "defaultValue": null
+        },
+        "password": {
+          "type": "SHORT_TEXT",
+          "displayName": "Password",
+          "description": "New password for the account. Prefer a value from a secret store over a literal one.",
+          "required": false,
+          "defaultValue": null
+        },
+        "userRoles": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "Roles (replaces all existing roles)",
+          "description": "The complete set of customer user roles. Saving replaces the existing roles, so include every role the customer user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "website": {
+          "type": "DROPDOWN",
+          "displayName": "Website",
+          "description": "The website this record is associated with.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    },
+    "update_user": {
+      "displayName": "Update User",
+      "description": "Updates an existing back-office user in OroCommerce. Only provided fields are changed.",
+      "requireAuth": true,
+      "type": null,
+      "props": {
+        "additionalAttributes": {
+          "type": "JSON",
+          "displayName": "Additional Attributes",
+          "description": "Custom fields, merged after the standard ones. Example: {\"myField\": \"value\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalHeaders": {
+          "type": "OBJECT",
+          "displayName": "Additional Headers",
+          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "required": false,
+          "defaultValue": null
+        },
+        "additionalRelations": {
+          "type": "JSON",
+          "displayName": "Additional Relations",
+          "description": "Custom relationships in linkage format. Example: {\"myRelation\": {\"data\": {\"type\": \"myentities\", \"id\": \"1\"}}}",
+          "required": false,
+          "defaultValue": null
+        },
+        "authStatus": {
+          "type": "DROPDOWN",
+          "displayName": "Auth Status",
+          "description": "Authentication status of the user (e.g. active, reset, locked).",
+          "required": false,
+          "defaultValue": null
+        },
+        "birthday": {
+          "type": "SHORT_TEXT",
+          "displayName": "Birthday",
+          "description": "Birth date in YYYY-MM-DD format.",
+          "required": false,
+          "defaultValue": null
+        },
+        "businessUnits": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "Business Units (replaces all existing business units)",
+          "description": "The complete set of business units the user belongs to. Saving replaces the existing list, so include every business unit the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "email": {
+          "type": "SHORT_TEXT",
+          "displayName": "Email",
+          "description": "Updated email address of the user.",
+          "required": false,
+          "defaultValue": null
+        },
+        "enabled": {
+          "type": "STATIC_DROPDOWN",
+          "displayName": "Enabled",
+          "description": "Enable or disable the user account.",
+          "required": false,
+          "defaultValue": "unchanged"
+        },
+        "firstName": {
+          "type": "SHORT_TEXT",
+          "displayName": "First Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "groups": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "User Groups (replaces all existing groups)",
+          "description": "The complete set of back-office groups for the user. Saving replaces the existing groups, so include every group the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "lastName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Last Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "middleName": {
+          "type": "SHORT_TEXT",
+          "displayName": "Middle Name",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "namePrefix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Prefix",
+          "description": "Honorific (e.g. Mr., Ms., Dr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "nameSuffix": {
+          "type": "SHORT_TEXT",
+          "displayName": "Name Suffix",
+          "description": "Suffix (e.g. PhD, Jr.).",
+          "required": false,
+          "defaultValue": null
+        },
+        "organization": {
+          "type": "DROPDOWN",
+          "displayName": "Organization",
+          "description": "The organization this record belongs to.",
+          "required": false,
+          "defaultValue": null
+        },
+        "organizations": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "Organizations (replaces all existing organizations)",
+          "description": "The complete set of organizations the user has access to. Saving replaces the existing list, so include every organization the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "owner": {
+          "type": "DROPDOWN",
+          "displayName": "Business Unit",
+          "description": "Search business units.",
+          "required": false,
+          "defaultValue": null
+        },
+        "password": {
+          "type": "SHORT_TEXT",
+          "displayName": "Password",
+          "description": "New password for the account. Prefer a value from a secret store over a literal one.",
+          "required": false,
+          "defaultValue": null
+        },
+        "phone": {
+          "type": "SHORT_TEXT",
+          "displayName": "Phone",
+          "description": null,
+          "required": false,
+          "defaultValue": null
+        },
+        "title": {
+          "type": "SHORT_TEXT",
+          "displayName": "Title",
+          "description": "Job title or position.",
+          "required": false,
+          "defaultValue": null
+        },
+        "userId": {
+          "type": "SHORT_TEXT",
+          "displayName": "User ID",
+          "description": "The numeric ID of the user to update.",
+          "required": true,
+          "defaultValue": null
+        },
+        "userRoles": {
+          "type": "MULTI_SELECT_DROPDOWN",
+          "displayName": "User Roles (replaces all existing roles)",
+          "description": "The complete set of back-office roles for the user. Saving replaces the existing roles, so include every role the user should keep.",
+          "required": false,
+          "defaultValue": null
+        },
+        "username": {
+          "type": "SHORT_TEXT",
+          "displayName": "Username",
+          "description": "Updated login name for the user.",
+          "required": false,
+          "defaultValue": null
+        }
+      }
+    }
+  },
+  "triggers": {
+    "oro-webhook-event": {
+      "displayName": "Oro Webhook Event",
+      "description": "Trigger when a selected webhook event is raised",
+      "requireAuth": true,
+      "type": "WEBHOOK",
+      "props": {
+        "signDeliveries": {
+          "type": "CHECKBOX",
+          "displayName": "Sign webhook deliveries",
+          "description": "Register the webhook with a shared secret and discard deliveries whose \"Webhook-Signature\" header does not match the body.",
+          "required": false,
+          "defaultValue": true
+        },
+        "topic": {
+          "type": "DROPDOWN",
+          "displayName": "Topic",
+          "description": "Only topics accessible by your connection are shown",
+          "required": true,
+          "defaultValue": null
+        }
+      }
+    }
+  }
+}

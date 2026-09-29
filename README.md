@@ -27,6 +27,14 @@ packages, so `scripts/fetch-ap.mjs` takes a sparse, blobless checkout of exactly
 The checkout lands in `.ap-src/`, which is git-ignored. `node_modules` stays at the repository root,
 outside that tree.
 
+Nothing in this repository writes into `.ap-src`, apart from the copy of the piece that
+`scripts/bundle.mjs` stages at `packages/pieces/community/orocommerce` so the CLI can resolve the
+workspace. That matters because the framework and the common package are inlined into the artifact,
+so an edit there would ship in the piece without appearing in any diff of this repository, and a
+cached tree would carry it from one build to the next. `npm run ap:check-clean` fails when the tree is
+at the wrong commit or when `git status` reports anything other than that staged copy, and CI runs it
+after every bundle. If a script here ever writes into the tree, fix the script rather than the check.
+
 ## Building and testing
 
 ```sh
@@ -37,6 +45,8 @@ npm test              # 7 suites, 97 tests
 npm run bundle        # bundles with @activepieces/cli and packs artifacts/*.tgz
 npm run i18n:check    # needs the bundle: it reads the built piece for the strings it exposes
 npm run verify        # checks the packed .tgz loads standalone with the expected surface
+npm run metadata:check # compares the piece's surface with the committed snapshot
+npm run ap:check-clean # asserts the fetched upstream tree is untouched
 ```
 
 `npm run bundle` fetches first if `.ap-src` is missing or is at the wrong commit, so it is safe to
@@ -74,8 +84,15 @@ framework the running engine actually has.
 
 Expect a bump to change the artifact. The framework and the common package are inlined into the
 bundle, so their contents move its size and its hash, and a changed label in the shared HTTP action
-changes the translation keys the piece exposes. Read the CI diff for `i18n:check` before merging a
-bump.
+changes the translation keys the piece exposes.
+
+A bump can also change what the piece exposes to flows without a line of this repository changing,
+because the shared HTTP action and all of its props come from `@activepieces/pieces-common`. The move
+to 0.92.0 did exactly that: seven props of the custom API call action changed type, label or required
+flag. `packages/orocommerce/metadata.snapshot.json` records the piece's surface and CI fails when the
+build no longer matches it, so run `npm run metadata:write` in the bump's own pull request and read
+what lands in the diff. Treat a changed property type or a required field becoming optional as a
+change to flows people have already built.
 
 ## Layout
 
@@ -86,7 +103,10 @@ tsconfig.base.json         compiler options the piece extends
 scripts/fetch-ap.mjs       sparse blobless checkout into .ap-src
 scripts/bundle.mjs         stage, bundle with the CLI, copy back, npm pack
 scripts/verify-artifact.mjs  checks on the packed .tgz
+scripts/metadata-snapshot.mjs  compares the built surface with the committed snapshot
+scripts/check-ap-clean.mjs   asserts .ap-src is unmodified at the pinned commit
 packages/orocommerce/      the piece, and the package that is published
+packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
 ```
 
 ## Reporting problems

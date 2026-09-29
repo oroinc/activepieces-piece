@@ -11,15 +11,16 @@
  * sources find the root node_modules on their own, and nothing has to be installed inside .ap-src.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PIN_FILE = join(REPO_ROOT, '.ap-pin');
 const SRC_DIR = join(REPO_ROOT, '.ap-src');
-const STAMP_FILE = join(SRC_DIR, '.ap-pin-stamp');
 const UPSTREAM = 'https://github.com/activepieces/activepieces.git';
+/** Where scripts/bundle.mjs stages the piece; the one path allowed to appear in the tree. */
+const STAGED_PIECE = 'packages/pieces/community/orocommerce';
 
 /** The only paths the bundler and the tests reach. Cone mode adds the root-level files for free. */
 export const SPARSE_PATHS = [
@@ -51,16 +52,49 @@ function git(args, cwd) {
   }
 }
 
-export function currentStamp() {
-  return existsSync(STAMP_FILE) ? readFileSync(STAMP_FILE, 'utf8').trim() : null;
+/**
+ * The commit the checkout currently sits on, or null if there is no usable checkout.
+ *
+ * Read from git rather than from a marker file this script writes, so that nothing here ever adds a
+ * file inside .ap-src. The tree has to stay exactly as upstream published it, both so the build is
+ * honest about what it compiled against and so scripts/check-ap-clean.mjs can assert it.
+ */
+/**
+ * What the checkout carries beyond the pinned commit, ignoring the copy of the piece that
+ * scripts/bundle.mjs stages for the CLI. scripts/check-ap-clean.mjs asserts this is empty.
+ */
+export function modifications() {
+  const result = spawnSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+    cwd: SRC_DIR,
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) return [];
+  return result.stdout
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .filter((line) => !line.slice(3).trim().startsWith(STAGED_PIECE));
+}
+
+export function currentCommit() {
+  if (!existsSync(join(SRC_DIR, '.git'))) return null;
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: SRC_DIR, encoding: 'utf8' });
+  return result.status === 0 ? result.stdout.trim() : null;
 }
 
 export function fetchUpstream({ force = false } = {}) {
   const pin = readPin();
 
-  if (!force && currentStamp() === pin) {
-    console.log(`.ap-src already at ${pin}, nothing to fetch.`);
-    return { dir: SRC_DIR, pin, fetched: false };
+  if (!force && currentCommit() === pin) {
+    // Being at the right commit is not enough to reuse the tree. A restored CI cache, or a local
+    // tree an interrupted build left behind, can sit at the pinned commit and still carry changes,
+    // and those would be inlined into the artifact. Re-fetch rather than build on top of them.
+    const dirty = modifications();
+    if (dirty.length === 0) {
+      console.log(`.ap-src already at ${pin}, nothing to fetch.`);
+      return { dir: SRC_DIR, pin, fetched: false };
+    }
+    console.log(`.ap-src is at ${pin} but carries ${dirty.length} change(s); fetching it again.`);
+    for (const entry of dirty.slice(0, 10)) console.log(`  ${entry}`);
   }
 
   rmSync(SRC_DIR, { recursive: true, force: true });
@@ -95,7 +129,6 @@ export function fetchUpstream({ force = false } = {}) {
     );
   }
 
-  writeFileSync(STAMP_FILE, `${pin}\n`);
   console.log(`.ap-src ready at ${pin}`);
   return { dir: SRC_DIR, pin, fetched: true };
 }

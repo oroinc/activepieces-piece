@@ -23,13 +23,13 @@ jobs:
           node-version: 20
           cache: npm
 
-      # The fetched upstream tree is reproducible from .ap-pin alone, so the pin file is the whole
-      # cache key: change the pin and the cache misses, which is exactly when it should.
+      # The cached tree is whatever the fetch script produced from the pin, so the key covers both.
+      # Keying on the pin alone would hand a build the tree an older version of the script wrote.
       - name: Cache the upstream checkout
         uses: actions/cache@v4
         with:
           path: .ap-src
-          key: ap-src-${{ hashFiles('.ap-pin') }}
+          key: ap-src-${{ hashFiles('.ap-pin', 'scripts/fetch-ap.mjs') }}
 
       - name: Fetch Activepieces sources
         run: npm run ap:fetch
@@ -46,6 +46,11 @@ jobs:
       - name: Bundle
         run: npm run bundle
 
+      # Runs after the bundle so it also covers anything the bundler wrote. Whatever is in the
+      # fetched tree is inlined into the artifact, so the tree has to stay as upstream published it.
+      - name: Check the upstream tree is unmodified
+        run: npm run ap:check-clean
+
       - name: Test
         run: npm test
 
@@ -54,6 +59,12 @@ jobs:
 
       - name: Verify artifact
         run: npm run verify
+
+      # Most of the piece's surface comes from upstream, so a pin bump can rename a label or make a
+      # field optional with nothing in this repository changing. This fails the build when that
+      # happens, so the change has to be accepted in the pull request that causes it.
+      - name: Check the metadata snapshot
+        run: npm run metadata:check
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
