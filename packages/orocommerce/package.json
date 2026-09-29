@@ -4,12 +4,14 @@
   "description": "Activepieces piece for the OroCommerce back-office JSON:API: create and update customers, customer users, back-office users, orders and invoices, and trigger flows from OroCommerce webhooks.",
   "keywords": [
     "activepieces",
+    "oro",
     "orocommerce",
     "orocrm",
     "b2b",
     "ecommerce",
     "json-api"
   ],
+  "author": "Oro, Inc. (https://oroinc.com)",
   "license": "MIT",
   "homepage": "https://github.com/oroinc/activepieces-piece/tree/main/packages/orocommerce#readme",
   "repository": {
