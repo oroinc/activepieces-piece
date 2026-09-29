@@ -14,22 +14,14 @@ OroCommerce webhooks.
 
 ## Install
 
-You need Activepieces 0.92.0 or later, and a platform admin account: installing a piece is a
-platform-level action, in the UI and over the API alike.
-
-There are two routes. Both end up at the same place, and which one you need depends on whether the
-instance can reach the npm registry.
-
-> 1.0.0 has not been released yet, so neither route has anything to install today. The first
-> `v1.0.0` tag creates the GitHub release with the `.tgz` attached; the npm package follows once
-> publishing is switched on.
+Installing a piece is a platform admin action, on an instance running Activepieces 0.92.0 or later.
 
 ### From npm
 
 > Available once 1.0.0 is published to npm.
 
-In the Activepieces UI, open **Platform Setup → Pieces**, click **Install Piece**, and fill the
-**Install a piece** dialog in:
+Sign in as a platform admin, open **Platform Setup → Pieces**, and click **Install Piece**. In the
+**Install a piece** dialog:
 
 | Field | Value |
 | --- | --- |
@@ -39,50 +31,25 @@ In the Activepieces UI, open **Platform Setup → Pieces**, click **Install Piec
 
 Then click **Install**.
 
-The same thing over the API is `POST /api/v1/pieces` with `packageType` `REGISTRY`. The endpoint
-takes a multipart form, which is what the UI sends:
+### The .tgz on each release
 
-```sh
-curl -X POST https://activepieces.example.com/api/v1/pieces \
-  -H "Authorization: Bearer $AP_TOKEN" \
-  --form-string packageType=REGISTRY \
-  --form-string scope=PLATFORM \
-  --form-string pieceName=@oroinc/piece-orocommerce \
-  --form-string pieceVersion=1.0.0
-```
+Every [release](https://github.com/oroinc/activepieces-piece/releases) attaches the packed piece as
+a `.tgz` and records its sha256 in the release notes. It is the same artifact that gets published,
+so that checksum is how anyone can confirm that what npm serves is what Oro released.
 
-`--form-string` matters for `pieceName`: with plain `-F`, curl reads a value starting with `@` as a
-file to upload.
-
-### From the .tgz on the GitHub release
-
-For an instance with no access to the npm registry. Every release attaches the packed piece; take
-the `.tgz` from the [releases page](https://github.com/oroinc/activepieces-piece/releases).
-
-In the same **Install a piece** dialog, set **Package Type** to **Packed Archive (.tgz)** and attach
-the file under **Package Archive**. **Piece Name** and **Piece Version** still have to match what is
-inside the archive.
-
-Over the API this is the same call with `packageType` `ARCHIVE` and the file attached:
-
-```sh
-curl -X POST https://activepieces.example.com/api/v1/pieces \
-  -H "Authorization: Bearer $AP_TOKEN" \
-  --form-string packageType=ARCHIVE \
-  --form-string scope=PLATFORM \
-  --form-string pieceName=@oroinc/piece-orocommerce \
-  --form-string pieceVersion=1.0.0 \
-  -F pieceArchive=@oroinc-piece-orocommerce-1.0.0.tgz
-```
-
-Here the `@` in `pieceArchive` is meant literally as "upload this file", which is why that one field
-uses `-F`.
+Whether it can be uploaded instead depends on the edition. In the **Install a piece** dialog,
+**Package Type → Packed Archive (.tgz)** is disabled unless the instance runs an edition above
+Community and its platform plan allows managing pieces - in upstream Activepieces (at `.ap-pin`),
+the dialog disables that option on `!isEnabled || !privatePiecesEnabled`, and
+`packages/server/api/src/app/flags/flag.service.ts` sets `PRIVATE_PIECES_ENABLED` to
+`getEdition() !== ApEdition.COMMUNITY`. On Community Edition the option stays greyed out, so install
+from npm there.
 
 ### Versions and upgrading
 
 A flow pins the exact piece version it was built with, so installing a newer version does not move
-existing flows onto it. An upgrade is two steps: install the new version, then re-pin each flow that
-should use it. Both versions stay installed until you remove the old one, so flows can be moved over
+existing flows onto it. An upgrade is two steps: install the new version, then update each flow's
+step to it. Both versions stay installed until you remove the old one, so flows can be moved over
 one at a time.
 
 Once the piece is installed, [setting up a connection](packages/orocommerce/README.md#setting-up-a-connection)
