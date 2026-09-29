@@ -2,7 +2,7 @@
   "piece": {
     "displayName": "OroCommerce",
     "description": "B2B digital commerce solution",
-    "minimumSupportedRelease": "0.86.0",
+    "minimumSupportedRelease": "0.92.0",
     "maximumSupportedRelease": null,
     "categories": [
       "COMMERCE"
