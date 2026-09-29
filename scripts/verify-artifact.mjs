@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACTS_DIR = join(REPO_ROOT, 'artifacts');
 
+const BUNDLED_PACKAGES = join(ARTIFACTS_DIR, 'bundled-packages.json');
+
 const EXPECTED_NAME = '@oroinc/piece-orocommerce';
 const EXPECTED_MAIN = './src/index.js';
 const EXPECTED_ACTIONS = 11;
@@ -56,6 +58,31 @@ function assertNoNodeModulesAbove(dir) {
   }
 }
 
+/**
+ * The notice is only worth shipping if it is complete. bundle.mjs records the packages the
+ * bundler reported as contributing code; every one of them has to appear in the notice with the
+ * version that was bundled, so a package added by a pin bump cannot ship unattributed.
+ */
+function checkNoticeNamesEveryBundledPackage(notice) {
+  if (!existsSync(BUNDLED_PACKAGES)) {
+    check('NOTICE names every bundled package', false, `no ${BUNDLED_PACKAGES}; run npm run bundle`);
+    return;
+  }
+  const expected = JSON.parse(readFileSync(BUNDLED_PACKAGES, 'utf8'));
+  if (expected.length === 0) {
+    check('NOTICE names every bundled package', false, 'the bundled package list is empty');
+    return;
+  }
+  const missing = expected.filter((pkg) => !notice.includes(`${pkg.name}@${pkg.version}`));
+  check(
+    'NOTICE names every bundled package',
+    missing.length === 0,
+    missing.length === 0
+      ? `${expected.length} packages`
+      : `missing ${missing.map((pkg) => `${pkg.name}@${pkg.version}`).join(', ')}`
+  );
+}
+
 function main() {
   const tarball = findTarball();
   console.log(`Verifying ${tarball}\n`);
@@ -80,6 +107,17 @@ function main() {
       manifest.dependencies && Object.keys(manifest.dependencies).length === 0,
       JSON.stringify(manifest.dependencies)
     );
+
+    // Most of the artifact is other people's code, inlined. Both files are written by
+    // scripts/bundle.mjs into the directory npm packs; npm force-includes LICENSE but drops
+    // anything else missing from the manifest's files list, so NOTICE is checked here rather than
+    // trusted to have survived the pack.
+    check('LICENSE ships in the package', existsSync(join(pkgDir, 'LICENSE')));
+    const noticePath = join(pkgDir, 'NOTICE');
+    check('NOTICE ships in the package', existsSync(noticePath));
+    if (existsSync(noticePath)) {
+      checkNoticeNamesEveryBundledPackage(readFileSync(noticePath, 'utf8'));
+    }
 
     const entry = join(pkgDir, 'src', 'index.js');
     check('src/index.js exists', existsSync(entry));
