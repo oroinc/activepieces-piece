@@ -108,6 +108,18 @@ function main() {
       JSON.stringify(manifest.dependencies)
     );
 
+    // The README is the npm page: without it npmjs.com shows the package with no description at
+    // all, which is how 1.0.0 first went out.
+    check('README.md ships in the package', existsSync(join(pkgDir, 'README.md')));
+
+    // The repository's other documents are for people working in it, not for anyone installing the
+    // package, and they are what Oro's other published packages keep out with an .npmignore. Here
+    // the manifest's files list is an allow-list and the package is packed from dist, so they stay
+    // out by not being copied there; this check is what stops that quietly changing.
+    for (const name of ['CHANGELOG.md', 'MAINTAINERS.md']) {
+      check(`${name} stays out of the package`, !existsSync(join(pkgDir, name)));
+    }
+
     // Most of the artifact is other people's code, inlined. Both files are written by
     // scripts/bundle.mjs into the directory npm packs; npm force-includes LICENSE but drops
     // anything else missing from the manifest's files list, so NOTICE is checked here rather than

@@ -18,8 +18,6 @@ Installing a piece is a platform admin action, on an instance running Activepiec
 
 ### From npm
 
-> Available once 1.0.0 is published to npm.
-
 Sign in as a platform admin, open **Platform Setup → Pieces**, and click **Install Piece**. In the
 **Install a piece** dialog:
 
@@ -62,6 +60,9 @@ is `packages/orocommerce`, and its `package.json` is the published manifest.
 
 Every pull request is reviewed. `.github/CODEOWNERS` names two front-end owners and GitHub requests
 a review from both; whichever of the two did not write the change is the one who reviews it.
+[MAINTAINERS.md](MAINTAINERS.md) names them, and records how a release is cut and who can publish.
+[packages/orocommerce/INTERNALS.md](packages/orocommerce/INTERNALS.md) is the piece's own code
+notes; read the relevant section before changing anything under `packages/orocommerce/src/`.
 
 ### Why the build fetches Activepieces
 
@@ -244,9 +245,13 @@ scripts/release-notes.mjs    the release identity written into the release notes
 scripts/notices.mjs          builds the NOTICE that ships in the package
 scripts/esbuild-metafile.cjs  makes the bundler hand back its metafile
 LICENSE                    the licence, copied into the package at build time
+MAINTAINERS.md             who maintains this, how to build it, how a release is cut
 .github/actions/build-piece  the build and the checks, shared by CI and the release workflow
 .github/workflows/           CI on every pull request, release on every v*.*.* tag
 packages/orocommerce/      the piece, and the package that is published
+packages/orocommerce/README.md   the npm page; the only document that ships in the package
+packages/orocommerce/CHANGELOG.md  what changed in each version
+packages/orocommerce/INTERNALS.md  notes for anyone changing the code under src/
 packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
 ```
 
