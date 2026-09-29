@@ -73,9 +73,6 @@ can start the flow with a payload of their choosing.
 The secret cannot be read back or changed after registration. To rotate it, disable and re-enable
 the trigger, which deletes the old webhook and registers a new one.
 
-Flows enabled before signing existed keep running unverified until they are next re-enabled or
-republished.
-
 ## Reporting issues
 
 Open an issue at <https://github.com/oroinc/activepieces-piece/issues> with your OroCommerce version, the
@@ -84,10 +81,10 @@ tokens or customer data.
 
 ---
 
-The rest of this file is for contributors. The repository bans code comments; this piece keeps
-section markers and a handful of short why-comments anyway, and everything longer lives here — read
-the relevant section before changing anything under `src/`. Most of them exist because of a bug that
-is easy to reintroduce.
+The rest of this file is for contributors. Keep comments short; longer explanations live in this
+README. The code keeps section markers and a handful of short why-comments, and anything longer
+belongs in a section here - read the relevant one before changing anything under `src/`. Most of
+them exist because of a bug that is easy to reintroduce.
 
 ## How it talks to Oro
 
@@ -193,13 +190,15 @@ Content-Type: application/vnd.api+json   (built in)
 `Authorization` is passed separately as the request's `authentication` and cannot be overridden from
 any of those.
 
-`Custom API Call` is built from the shared `createCustomApiCallAction` (`packages/pieces/common`),
-which merges `{...stepHeaders, ...authMappingResult}` — the step's own headers land *first*, so
-whatever `authMapping` returns would normally beat them. That is why `authMapping` in
-`src/lib/actions/api-call.ts` re-applies `toHeaderRecord({ value: propsValue['headers'] })` after
-the connection headers: it restores the same precedence as above. `propsValue` is the second
-argument `createCustomApiCallAction` hands to `authMapping`; without using it the step's headers
-would silently lose to the connection's. `Authorization` is appended last and always wins.
+`Custom API Call` is built from the shared `createCustomApiCallAction` (`packages/pieces/common`
+in upstream Activepieces, at `.ap-pin`), which merges `{...stepHeaders, ...authMappingResult}` —
+the step's own headers land *first*, so whatever `authMapping` returns would normally beat them.
+That is why `authMapping` in `src/lib/actions/api-call.ts` re-applies
+`toHeaderRecord({ value: propsValue['headers'] })` after the connection headers: it restores the
+same precedence as above.
+`propsValue` is the second argument `createCustomApiCallAction` hands to `authMapping`; without
+using it the step's headers would silently lose to the connection's. `Authorization` is appended
+last and always wins.
 
 ## Dropdowns and paging
 
@@ -226,8 +225,9 @@ rather than throwing, so one broken prop does not break the whole step.
 
 ## Multi-selects deliberately have no `refreshOnSearch`
 
-Do not add it. `packages/web/src/components/custom/multi-select-piece-property.tsx` addresses
-selections as **indices into the current options array**: it renders items with
+Do not add it. In upstream Activepieces (at `.ap-pin`),
+`packages/web/src/components/custom/multi-select-piece-property.tsx` addresses selections as
+**indices into the current options array**: it renders items with
 `value: String(index)` and maps a change back with `options[Number(index)].value`. Selected indices
 are resolved against `[...cachedOptions, ...options]`, while writes read `options` alone.
 
@@ -267,8 +267,8 @@ re-serialized `context.payload.body` — JSON round-tripping reorders keys and t
 match.
 
 Verification runs only when this trigger has a secret stored. Oro sends no signature header when a
-webhook has no secret, so header presence is never trusted. A store entry written before signing
-existed has no secret, and that absence means "keep running unverified".
+webhook has no secret, so header presence is never trusted: a stored entry without a secret means
+"keep running unverified".
 
 `onEnable` deletes the webhook it just created when storing the secret fails — a live webhook whose
 secret is unrecoverable would have every delivery discarded — and drops a leftover registration
@@ -280,20 +280,10 @@ A rejected delivery returns `[]` with a `console.warn`: no run is created and Or
 
 ## Local development
 
-Run these from the repository root, which owns the toolchain:
-
-```bash
-npm ci
-npm run ap:fetch     # sparse checkout of Activepieces at the commit in .ap-pin
-npm run lint
-npm test             # vitest, 7 suites
-npm run bundle       # bundles and packs artifacts/*.tgz
-npm run i18n:check   # reads the bundle, so run it after bundle
-npm run verify       # checks the packed artifact
-```
-
-The root README explains the fetch, the pin and how to bump it. `.github/workflows/ci.yml` runs
-exactly the sequence above on every pull request and on every push to `main`.
+The toolchain lives at the repository root, and so do the commands: see
+[Building and testing](../../README.md#building-and-testing) in the root README, which also explains
+the fetch, the pin and how to bump it. `.github/workflows/ci.yml` runs exactly that sequence on every
+pull request and on every push to `main`.
 
 `test/jsonapi-roundtrip.test.ts` guards the serialize/deserialize contract above,
 `test/line-items.test.ts` guards line-item validation, `test/body-utils.test.ts` guards the
@@ -306,19 +296,21 @@ with unusable input, and `test/i18n.test.ts` runs the i18n gate below.
 translations. Both are generated, not hand-maintained:
 
 ```bash
-npm run cli pieces generate-translation-file orocommerce   # canonical; writes translation.json only
-npm run build && npm run i18n:write                        # also reconciles the locale files
+npm run build && npm run i18n:write   # regenerates translation.json and the locale files
 ```
 
-The two are not interchangeable. The CLI rewrites `translation.json` and nothing else, and it writes
-no trailing newline; `i18n:write` rewrites all six files and does. Prefer `i18n:write` — it is the
-one that keeps the locale files in step with the source.
+`i18n:write` is the only generator this repository has, and it needs the built piece, so run the
+build first. Activepieces' own CLI has a `pieces generate-translation-file` command, but it finds a
+piece by looking under `<cwd>/packages/pieces`, a layout that exists only inside the fetched upstream
+tree, so it cannot be pointed at `packages/orocommerce` from here. `i18n:write` walks the same
+metadata paths and truncates keys the same way, and it also reconciles the locale files, which the
+CLI does not.
 
 `npm run i18n:check` (`tools/check-i18n.mjs`) fails when they drift, and `test/i18n.test.ts` runs it
 as part of the suite, so `npm test` covers it. It imports the **built** piece from `dist/` and only
 checks that the file exists, never that it is current, so run `npm run bundle` before it. It walks
 the same 19 metadata paths as `pieceTranslation.pathsToValuesToTranslate` in
-`packages/pieces/framework/src/lib/i18n.ts` in the fetched tree, and
+`packages/pieces/framework/src/lib/i18n.ts` in upstream Activepieces (at `.ap-pin`), and
 truncates keys at 512 characters exactly as the official generator does. It fails on keys missing
 from or stale in `translation.json`, on any locale file whose key set differs from it, and on empty
 values. Values identical to the English source are a warning; `--strict-untranslated` promotes them
@@ -347,10 +339,10 @@ make no sense on a step.
 
 Everything *downstream* of the authoring API already supports it: the builder renders
 `PropertyType.SECRET_TEXT` with `type='password'`
-(`packages/web/src/app/builder/piece-properties/properties-utils.tsx`), `piecePropertiesUtils.buildSchema`
-validates it as a string, and the web form seeds it with `''`. Only the factory and the union entry
-are missing. Adding them is a framework change worth proposing on its own merits for every piece —
-not something to smuggle in here.
+(`packages/web/src/app/builder/piece-properties/properties-utils.tsx` in upstream Activepieces, at
+`.ap-pin`), `piecePropertiesUtils.buildSchema` validates it as a string, and the web form seeds it
+with `''`. Only the factory and the union entry are missing. Adding them is a framework change
+worth proposing on its own merits for every piece — not something to smuggle in here.
 
 Note that it would fix only the *display*. A step-level `SECRET_TEXT` value is still persisted
 verbatim in the flow version, so removing passwords from flow storage altogether needs a
@@ -382,22 +374,24 @@ client secret always come from the connection.
   props out of `DynamicProperties` into a plain `Property.Array` is the only fix, and it is a
   separate decision.
 - `src/i18n/pl.json` and `src/i18n/uk.json` are never loaded. `pieceTranslation.initializeI18n`
-  iterates `LocalesEnum` (`packages/core/utils/src/lib/locale.ts`), which has no Polish or
-  Ukrainian. The gate keeps them in sync so they are ready if those locales are added, and
+  iterates `LocalesEnum` (`packages/core/utils/src/lib/locale.ts` in upstream Activepieces, at
+  `.ap-pin`), which has no Polish or Ukrainian. The gate keeps them in sync so they are ready if
+  those locales are added, and
   `i18n:check` prints a warning for each.
 - **An untouched `Property.Checkbox` arrives as `false`, not `undefined`, so no update action may use
   one.** The builder seeds an unset checkbox with `property.defaultValue ?? false`
-  (`packages/web/src/features/pieces/utils/form-utils.tsx`) and persists it into the step input, and
+  (`packages/web/src/features/pieces/utils/form-utils.tsx` in upstream Activepieces, at `.ap-pin`)
+  and persists it into the step input, and
   `checkboxProcessor` passes `false` through — it is the one property type whose "empty" form value is
   not normalised to `undefined` the way `textProcessor` and `numberProcessor` normalise theirs. A
-  checkbox therefore cannot say "leave this alone": `update-user` and `update-customer-user` used to
-  send `enabled: false` on every call and disable the account they were only asked to rename, and
-  `assertUpdateNotEmpty` could never fire for them. Those flags are now `booleanUpdateDropdown` in
-  `src/lib/common/props.ts` — a three-state `Property.StaticDropdown` defaulting to *Leave unchanged*,
-  as in `campaign-monitor/src/lib/actions/update-subscriber-details.ts` — read back with
-  `readBooleanUpdate`, which also ignores the `false` a step saved by the checkbox version still
-  holds, so an existing flow stops disabling its target. Give any new boolean on an update action the
-  same treatment. A `defaultValue` is not a fix: `true` would unconditionally *enable* instead. Create
+  checkbox therefore cannot say "leave this alone": a checkbox on `update-user` or
+  `update-customer-user` would send `enabled: false` on every call and disable the account it was
+  only asked to rename, and `assertUpdateNotEmpty` could never fire for it. Those flags are
+  `booleanUpdateDropdown` in `src/lib/common/props.ts` - a three-state `Property.StaticDropdown`
+  defaulting to *Leave unchanged*, as in
+  `campaign-monitor/src/lib/actions/update-subscriber-details.ts` in upstream Activepieces (at
+  `.ap-pin`) - read back with `readBooleanUpdate`. Give any new boolean on an update action the same
+  treatment. A `defaultValue` is not a fix: `true` would unconditionally *enable* instead. Create
   actions keep their checkboxes, where an unchecked box and `false` mean the same thing. Note that a
   hand-written `propsValue` in `test/action-guards.test.ts` does not reproduce the builder's `false` —
   a case that stands in for a saved step has to pass it explicitly.

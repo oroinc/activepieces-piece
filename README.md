@@ -7,15 +7,96 @@ OroCommerce webhooks.
 
 | | |
 | --- | --- |
-| Published package | `packages/orocommerce` |
+| Published package | [`@oroinc/piece-orocommerce`](https://www.npmjs.com/package/@oroinc/piece-orocommerce) |
 | Actions | 11 |
 | Triggers | 1 (`oro-webhook-event`) |
 | Supported Activepieces | 0.92.0 and later |
 
+## Install
+
+You need Activepieces 0.92.0 or later, and a platform admin account: installing a piece is a
+platform-level action, in the UI and over the API alike.
+
+There are two routes. Both end up at the same place, and which one you need depends on whether the
+instance can reach the npm registry.
+
+> 1.0.0 has not been released yet, so neither route has anything to install today. The first
+> `v1.0.0` tag creates the GitHub release with the `.tgz` attached; the npm package follows once
+> publishing is switched on.
+
+### From npm
+
+> Available once 1.0.0 is published to npm.
+
+In the Activepieces UI, open **Platform Setup → Pieces**, click **Install Piece**, and fill the
+**Install a piece** dialog in:
+
+| Field | Value |
+| --- | --- |
+| **Package Type** | **NPM Registry** |
+| **Piece Name** | `@oroinc/piece-orocommerce` |
+| **Piece Version** | the exact version, for example `1.0.0` |
+
+Then click **Install**.
+
+The same thing over the API is `POST /api/v1/pieces` with `packageType` `REGISTRY`. The endpoint
+takes a multipart form, which is what the UI sends:
+
+```sh
+curl -X POST https://activepieces.example.com/api/v1/pieces \
+  -H "Authorization: Bearer $AP_TOKEN" \
+  --form-string packageType=REGISTRY \
+  --form-string scope=PLATFORM \
+  --form-string pieceName=@oroinc/piece-orocommerce \
+  --form-string pieceVersion=1.0.0
+```
+
+`--form-string` matters for `pieceName`: with plain `-F`, curl reads a value starting with `@` as a
+file to upload.
+
+### From the .tgz on the GitHub release
+
+For an instance with no access to the npm registry. Every release attaches the packed piece; take
+the `.tgz` from the [releases page](https://github.com/oroinc/activepieces-piece/releases).
+
+In the same **Install a piece** dialog, set **Package Type** to **Packed Archive (.tgz)** and attach
+the file under **Package Archive**. **Piece Name** and **Piece Version** still have to match what is
+inside the archive.
+
+Over the API this is the same call with `packageType` `ARCHIVE` and the file attached:
+
+```sh
+curl -X POST https://activepieces.example.com/api/v1/pieces \
+  -H "Authorization: Bearer $AP_TOKEN" \
+  --form-string packageType=ARCHIVE \
+  --form-string scope=PLATFORM \
+  --form-string pieceName=@oroinc/piece-orocommerce \
+  --form-string pieceVersion=1.0.0 \
+  -F pieceArchive=@oroinc-piece-orocommerce-1.0.0.tgz
+```
+
+Here the `@` in `pieceArchive` is meant literally as "upload this file", which is why that one field
+uses `-F`.
+
+### Versions and upgrading
+
+A flow pins the exact piece version it was built with, so installing a newer version does not move
+existing flows onto it. An upgrade is two steps: install the new version, then re-pin each flow that
+should use it. Both versions stay installed until you remove the old one, so flows can be moved over
+one at a time.
+
+Once the piece is installed, [setting up a connection](packages/orocommerce/README.md#setting-up-a-connection)
+is the next step.
+
+## Contributing
+
 The repository root is tooling only. Nothing at the root is published; the package that gets packed
 is `packages/orocommerce`, and its `package.json` is the published manifest.
 
-## Why the build fetches Activepieces
+Every pull request is reviewed. `.github/CODEOWNERS` names two front-end owners and GitHub requests
+a review from both; whichever of the two did not write the change is the one who reviews it.
+
+### Why the build fetches Activepieces
 
 The piece is compiled against `@activepieces/pieces-framework` and `@activepieces/pieces-common`.
 The copies of those on npm lag a long way behind the engine, so the framework has to come from
@@ -27,7 +108,8 @@ packages, so `scripts/fetch-ap.mjs` takes a sparse, blobless checkout of exactly
 The checkout lands in `.ap-src/`, which is git-ignored. `node_modules` stays at the repository root,
 outside that tree.
 
-Nothing in this repository writes into `.ap-src`, apart from the copy of the piece that
+The upstream packages fetched at `.ap-pin` are used exactly as upstream published them: nothing in
+this repository patches, forks or writes into `.ap-src`, apart from the copy of the piece that
 `scripts/bundle.mjs` stages at `packages/pieces/community/orocommerce` so the CLI can resolve the
 workspace. That matters because the framework and the common package are inlined into the artifact,
 so an edit there would ship in the piece without appearing in any diff of this repository, and a
@@ -35,7 +117,7 @@ cached tree would carry it from one build to the next. `npm run ap:check-clean` 
 at the wrong commit or when `git status` reports anything other than that staged copy, and CI runs it
 after every bundle. If a script here ever writes into the tree, fix the script rather than the check.
 
-## Building and testing
+### Building and testing
 
 ```sh
 npm ci
@@ -46,6 +128,7 @@ npm run bundle        # bundles with @activepieces/cli and packs artifacts/*.tgz
 npm run i18n:check    # needs the bundle: it reads the built piece for the strings it exposes
 npm run verify        # checks the packed .tgz loads standalone with the expected surface
 npm run metadata:check # compares the piece's surface with the committed snapshot
+npm run metadata:write # rewrites that snapshot, for a change that is meant to move the surface
 npm run ap:check-clean # asserts the fetched upstream tree is untouched
 ```
 
@@ -59,7 +142,7 @@ through the workspace aliases of the repository it finds by walking up from the 
 to be the Activepieces tree. Only `package.json` and `src/` are staged; the output is copied back to
 `packages/orocommerce/dist` and packed from there.
 
-## The pin
+### The pin
 
 `.ap-pin` holds one full 40-character upstream commit sha:
 
@@ -72,15 +155,16 @@ It must be a sha. Not a tag, not a version string, and never `git describe`. Ups
 different trees, and a fork carries no upstream release tags for `git describe` to find. Two trees
 that both call themselves 0.88.1 shipped different versions of `core-utils` and `core-piece-types`.
 
-### Bumping it
+The pin above is the commit upstream tagged `0.92.0`.
+
+#### Bumping it
 
 Raise the bump as **its own pull request**, changing `.ap-pin` and nothing else, so that the effect
 on the artifact is visible on its own.
 
-The pin should be the upstream commit the Oro Activepieces image is built from. Derive it from the
-embedding branch rather than from a version string: take the second parent of the last `origin/main`
-sync merge reachable from the branch the image is based on. That is the upstream commit whose
-framework the running engine actually has.
+Maintainers set the pin to the upstream commit of the Activepieces version Oro runs, and never below
+0.92.0, which is the oldest version this piece supports. Whatever the source, what lands in `.ap-pin`
+is always a full upstream commit sha.
 
 Expect a bump to change the artifact. The framework and the common package are inlined into the
 bundle, so their contents move its size and its hash, and a changed label in the shared HTTP action
@@ -94,12 +178,12 @@ build no longer matches it, so run `npm run metadata:write` in the bump's own pu
 what lands in the diff. Treat a changed property type or a required field becoming optional as a
 change to flows people have already built.
 
-## Releasing
+### Releasing
 
 A release is one tag on main. Pushing it builds the piece from that commit and publishes the result.
 Nothing is built by hand, and nothing is uploaded to a release by hand.
 
-### Choosing the version
+#### Choosing the version
 
 `packages/orocommerce/package.json` holds the version. Bump it in the pull request that makes the
 change, not at tag time:
@@ -117,7 +201,7 @@ field that became optional is a major bump, a new optional prop is a minor one, 
 leaves `metadata.snapshot.json` untouched is a patch. The snapshot tells you what moved; which bump
 that deserves is still a judgement somebody has to make.
 
-### Cutting the release
+#### Cutting the release
 
 Merge the version bump first, then tag the merge commit on main:
 
@@ -147,7 +231,7 @@ It then:
 `npm run release:notes` writes the same notes locally from whatever is in `artifacts/`, which is the
 way to see what a release would say before cutting one.
 
-### Turning on npm publishing
+#### Turning on npm publishing
 
 Publishing is off. Until it is switched on, a tag produces a GitHub release with the `.tgz` attached
 and nothing else, which is a complete way to ship the piece: Activepieces installs a piece from a
@@ -172,13 +256,13 @@ publisher on the package page and delete the secret. Nothing in the workflow has
 with trusted publishing, npm authenticates the run through the `id-token` permission the job already
 has.
 
-### A published version is final
+#### A published version is final
 
 A version that has been released is never rebuilt and never republished. Re-running the workflow on
 an existing tag changes nothing, and moving a tag does not move what was published. If a release is
 wrong, the fix is the next version.
 
-## Layout
+### Layout
 
 ```
 .ap-pin                    the pinned upstream commit
