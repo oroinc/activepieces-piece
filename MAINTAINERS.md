@@ -39,14 +39,30 @@ npm run verify         # checks the packed .tgz loads standalone with the expect
 npm run metadata:check # compares the piece's surface with the committed snapshot
 ```
 
+Two more rewrite what the checks above hold the build to, so they are run deliberately and their
+output is read in the diff, never to make a red build go green:
+
+```sh
+npm run metadata:write # rewrites the surface snapshot, for a change meant to move the surface
+npm run i18n:write     # regenerates translation.json and reconciles the locale files
+```
+
 That is the same order `.github/actions/build-piece` runs, and both CI and the release workflow use
 that action, so a tag is built and checked exactly the way a pull request is. `npm run bundle`
 fetches first if `.ap-src` is missing or at the wrong commit, so it is safe to run on its own.
 
 The build fetches Activepieces because the piece is compiled against
 `@activepieces/pieces-framework` and `@activepieces/pieces-common`, whose npm copies lag a long way
-behind the engine. `README.md` explains the fetch, the pin in `.ap-pin` and how to bump it;
+behind the engine. `README.md` explains that fetch, the pin in `.ap-pin` and how to bump it;
 `packages/orocommerce/ARCHITECTURE.md` explains how the piece itself is built.
+
+The bundle is produced by the official Activepieces CLI, pinned exactly in the root
+`devDependencies`. The piece is staged into the fetched tree at
+`packages/pieces/community/orocommerce` before bundling, because the CLI resolves `@activepieces/*`
+through the workspace aliases of the repository it finds by walking up from the piece, and that has
+to be the Activepieces tree. Only `package.json` and `src/` are staged; the output is copied back to
+`packages/orocommerce/dist` and packed from there, so only what `scripts/bundle.mjs` puts in that
+directory can ship.
 
 ## How a release happens
 
