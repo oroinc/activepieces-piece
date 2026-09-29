@@ -12,6 +12,7 @@
     "ap:check-clean": "node scripts/check-ap-clean.mjs",
     "bundle": "node scripts/bundle.mjs",
     "verify": "node scripts/verify-artifact.mjs",
+    "release:notes": "node scripts/release-notes.mjs",
     "metadata:check": "node scripts/metadata-snapshot.mjs",
     "metadata:write": "node scripts/metadata-snapshot.mjs --write",
     "test": "vitest run --root packages/orocommerce",

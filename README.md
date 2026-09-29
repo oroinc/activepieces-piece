@@ -94,6 +94,90 @@ build no longer matches it, so run `npm run metadata:write` in the bump's own pu
 what lands in the diff. Treat a changed property type or a required field becoming optional as a
 change to flows people have already built.
 
+## Releasing
+
+A release is one tag on main. Pushing it builds the piece from that commit and publishes the result.
+Nothing is built by hand, and nothing is uploaded to a release by hand.
+
+### Choosing the version
+
+`packages/orocommerce/package.json` holds the version. Bump it in the pull request that makes the
+change, not at tag time:
+
+- **major** when a flow somebody has already built can break: an action or a trigger removed or
+  renamed, a new required prop, a prop whose type changed, output a flow reads that is no longer
+  there.
+- **minor** for a new action or trigger, or a new optional prop.
+- **patch** for a fix that leaves the piece's surface as it was.
+
+A pin bump is the case that needs a decision. Moving `.ap-pin` can change the props of the shared
+HTTP action without a line of this repository changing, and `npm run metadata:write` puts that
+change in the diff of the bump's own pull request. Read that diff: a changed prop type or a required
+field that became optional is a major bump, a new optional prop is a minor one, and a pin bump that
+leaves `metadata.snapshot.json` untouched is a patch. The snapshot tells you what moved; which bump
+that deserves is still a judgement somebody has to make.
+
+### Cutting the release
+
+Merge the version bump first, then tag the merge commit on main:
+
+```sh
+git checkout main && git pull
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+The tag must be exactly `v` plus the version in `packages/orocommerce/package.json`, and the commit
+it points at must be on main. `.github/workflows/release.yml` checks both before it builds anything,
+so a tag pushed from a branch, or one that names a version nobody merged, fails in seconds.
+
+It then:
+
+1. builds the piece with the same composite action CI uses, so the tag runs lint, the test suite,
+   the translation check, the check that the fetched Activepieces tree is unmodified, the checks on
+   the packed artifact and the metadata snapshot;
+2. writes the release notes, which record the tag, the tagged commit, the `.ap-pin` commit, the
+   sha256 of the `.tgz` and the sha256 of `package/src/index.js` inside it. Those five together are
+   what identifies a release: most of what ships in the artifact is inlined from Activepieces at the
+   pinned commit, so the commit of this repository does not on its own say what somebody downloaded;
+3. creates the GitHub release for the tag, with the `.tgz` attached and those notes. If a release
+   for that tag already exists, it stops and changes nothing;
+4. publishes to npm, if publishing is switched on.
+
+`npm run release:notes` writes the same notes locally from whatever is in `artifacts/`, which is the
+way to see what a release would say before cutting one.
+
+### Turning on npm publishing
+
+Publishing is off. Until it is switched on, a tag produces a GitHub release with the `.tgz` attached
+and nothing else, which is a complete way to ship the piece: Activepieces installs a piece from a
+packed tarball.
+
+To switch it on, in the repository settings:
+
+- set the Actions **variable** `NPM_PUBLISH_ENABLED` to `true`;
+- add the Actions **secret** `NPM_TOKEN`, an npm granular access token with publish rights on the
+  `@oroinc` scope.
+
+The publish step runs `npm publish --provenance --access public` on the exact `.tgz` the release
+carries, and it asks npm for the version first: if `@oroinc/piece-orocommerce@<version>` is already
+there, it skips.
+
+The token is a first-publish measure, not the end state. npm's trusted publishing (OIDC) removes the
+long-lived token, but a trusted publisher can only be configured in the settings of a package that
+already exists on npm, and this package is not on npm yet
+([npm docs](https://docs.npmjs.com/trusted-publishers/), [npm/cli#8544](https://github.com/npm/cli/issues/8544)).
+So the first release goes out with `NPM_TOKEN`; after it lands, configure GitHub Actions as a trusted
+publisher on the package page and delete the secret. Nothing in the workflow has to change for that:
+with trusted publishing, npm authenticates the run through the `id-token` permission the job already
+has.
+
+### A published version is final
+
+A version that has been released is never rebuilt and never republished. Re-running the workflow on
+an existing tag changes nothing, and moving a tag does not move what was published. If a release is
+wrong, the fix is the next version.
+
 ## Layout
 
 ```
@@ -105,6 +189,9 @@ scripts/bundle.mjs         stage, bundle with the CLI, copy back, npm pack
 scripts/verify-artifact.mjs  checks on the packed .tgz
 scripts/metadata-snapshot.mjs  compares the built surface with the committed snapshot
 scripts/check-ap-clean.mjs   asserts .ap-src is unmodified at the pinned commit
+scripts/release-notes.mjs    the release identity written into the release notes
+.github/actions/build-piece  the build and the checks, shared by CI and the release workflow
+.github/workflows/           CI on every pull request, release on every v*.*.* tag
 packages/orocommerce/      the piece, and the package that is published
 packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
 ```
