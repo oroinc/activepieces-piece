@@ -108,6 +108,15 @@ function main() {
       JSON.stringify(manifest.dependencies)
     );
 
+    // README.md must ship; no other .md may.
+    check('README.md ships in the package', existsSync(join(pkgDir, 'README.md')));
+    const strayDocs = readdirSync(pkgDir).filter((f) => f.endsWith('.md') && f !== 'README.md');
+    check(
+      'no document other than README.md ships',
+      strayDocs.length === 0,
+      strayDocs.join(', ') || 'none'
+    );
+
     // Most of the artifact is other people's code, inlined. Both files are written by
     // scripts/bundle.mjs into the directory npm packs; npm force-includes LICENSE but drops
     // anything else missing from the manifest's files list, so NOTICE is checked here rather than

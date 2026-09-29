@@ -25,6 +25,7 @@ const ARTIFACTS_DIR = join(REPO_ROOT, 'artifacts');
 const CLI_ENTRY = join(REPO_ROOT, 'node_modules', '@activepieces', 'cli', 'index.js');
 const METAFILE_HOOK = join(REPO_ROOT, 'scripts', 'esbuild-metafile.cjs');
 const LICENCE_FILE = join(REPO_ROOT, 'LICENSE');
+const README_FILE = join(PIECE_DIR, 'README.md');
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: 'inherit', ...options });
@@ -101,10 +102,9 @@ export function bundle() {
   rmSync(localDist, { recursive: true, force: true });
   cpSync(builtDist, localDist, { recursive: true });
 
-  console.log('Writing LICENSE and NOTICE into the package');
-  // npm packs from dist, so anything that has to ship has to be put there. The licence is this
-  // repository's own; the notice covers everything inlined into the bundle and is generated from
-  // the metafile, so a pin bump that pulls in a new package updates it or fails the build.
+  console.log('Writing README, LICENSE and NOTICE into the package');
+  // README, LICENSE and NOTICE ship; other docs stay out because only what is copied into dist is
+  // packed.
   const packages = bundledPackages(JSON.parse(readFileSync(metafilePath, 'utf8')));
   const manifest = JSON.parse(readFileSync(join(localDist, 'package.json'), 'utf8'));
   const notice = buildNotice({
@@ -113,12 +113,13 @@ export function bundle() {
     pieceName: manifest.name,
     copyright: licenceCopyright(),
   });
+  cpSync(README_FILE, join(localDist, 'README.md'));
   cpSync(LICENCE_FILE, join(localDist, 'LICENSE'));
   writeFileSync(join(localDist, 'NOTICE'), notice);
-  // The bundler rewrites the manifest with a files allow-list. npm force-includes LICENSE whatever
-  // that list says, but not NOTICE, so without this the notice is written and then dropped on pack.
+  // The bundler rewrites the manifest with a files allow-list. npm force-includes README.md and
+  // LICENSE whatever that list says, but not NOTICE, so all three are listed here.
   if (Array.isArray(manifest.files) && !manifest.files.includes('NOTICE')) {
-    manifest.files = [...manifest.files, 'LICENSE', 'NOTICE'];
+    manifest.files = [...manifest.files, 'README.md', 'LICENSE', 'NOTICE'];
     writeFileSync(join(localDist, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   writeFileSync(

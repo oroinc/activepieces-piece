@@ -706,7 +706,7 @@ export const customerUserRolesMultiDropdown = makeMultiSelectDropdown({
 
 // --- Boolean flags on update actions ------------------------------------------
 
-// An untouched Property.Checkbox arrives as `false`, not `undefined` (see the README gotcha), so a
+// An untouched Property.Checkbox arrives as `false`, not `undefined` (see the gotcha in ARCHITECTURE.md), so a
 // checkbox cannot say "leave this alone" — an update action built on one sends the flag off on every
 // run and disables the record it was only meant to rename. A three-state dropdown can say it.
 export const LEAVE_UNCHANGED = 'unchanged';
