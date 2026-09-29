@@ -60,9 +60,17 @@ is `packages/orocommerce`, and its `package.json` is the published manifest.
 
 Every pull request is reviewed. `.github/CODEOWNERS` names two front-end owners and GitHub requests
 a review from both; whichever of the two did not write the change is the one who reviews it.
-[MAINTAINERS.md](MAINTAINERS.md) names them, and records how a release is cut and who can publish.
-[packages/orocommerce/INTERNALS.md](packages/orocommerce/INTERNALS.md) is the piece's own code
-notes; read the relevant section before changing anything under `packages/orocommerce/src/`.
+
+Two documents carry the rest, and this one does not repeat them:
+
+- **[MAINTAINERS.md](MAINTAINERS.md)** - who maintains the repository, how to build and test it, how
+  a release is cut and who can publish.
+- **[packages/orocommerce/ARCHITECTURE.md](packages/orocommerce/ARCHITECTURE.md)** - how the piece is
+  built and why. Read the relevant section before changing anything under
+  `packages/orocommerce/src/`.
+
+What stays here is what neither of those explains: why the build fetches Activepieces at all, and the
+pin that decides which version it fetches.
 
 ### Why the build fetches Activepieces
 
@@ -85,31 +93,6 @@ cached tree would carry it from one build to the next. `npm run ap:check-clean` 
 at the wrong commit or when `git status` reports anything other than that staged copy, and CI runs it
 after every bundle. If a script here ever writes into the tree, fix the script rather than the check.
 
-### Building and testing
-
-```sh
-npm ci
-npm run ap:fetch      # sparse checkout of Activepieces at the commit in .ap-pin
-npm run lint
-npm test              # 7 suites, 97 tests
-npm run bundle        # bundles with @activepieces/cli and packs artifacts/*.tgz
-npm run i18n:check    # needs the bundle: it reads the built piece for the strings it exposes
-npm run verify        # checks the packed .tgz loads standalone with the expected surface
-npm run metadata:check # compares the piece's surface with the committed snapshot
-npm run metadata:write # rewrites that snapshot, for a change that is meant to move the surface
-npm run ap:check-clean # asserts the fetched upstream tree is untouched
-```
-
-`npm run bundle` fetches first if `.ap-src` is missing or is at the wrong commit, so it is safe to
-run on its own.
-
-The bundle is produced by the official Activepieces CLI, pinned exactly in the root
-`devDependencies`. The piece is staged into the fetched tree at
-`packages/pieces/community/orocommerce` before bundling, because the CLI resolves `@activepieces/*`
-through the workspace aliases of the repository it finds by walking up from the piece, and that has
-to be the Activepieces tree. Only `package.json` and `src/` are staged; the output is copied back to
-`packages/orocommerce/dist` and packed from there.
-
 ### The pin
 
 `.ap-pin` holds one full 40-character upstream commit sha:
@@ -131,8 +114,10 @@ Raise the bump as **its own pull request**, changing `.ap-pin` and nothing else,
 on the artifact is visible on its own.
 
 Maintainers set the pin to the upstream commit of the Activepieces version Oro runs, and never below
-0.92.0, which is the oldest version this piece supports. Whatever the source, what lands in `.ap-pin`
-is always a full upstream commit sha.
+0.92.0, which is the oldest version Oro supports the piece on. Note that the piece's own
+`minimumSupportedRelease` is lower, so Activepieces does not enforce that floor; raising it is a
+change to the piece's surface and belongs in its own pull request. Whatever the source, what lands
+in `.ap-pin` is always a full upstream commit sha.
 
 Expect a bump to change the artifact. The framework and the common package are inlined into the
 bundle, so their contents move its size and its hash, and a changed label in the shared HTTP action
@@ -144,88 +129,14 @@ to 0.92.0 did exactly that: seven props of the custom API call action changed ty
 flag. `packages/orocommerce/metadata.snapshot.json` records the piece's surface and CI fails when the
 build no longer matches it, so run `npm run metadata:write` in the bump's own pull request and read
 what lands in the diff. Treat a changed property type or a required field becoming optional as a
-change to flows people have already built.
+change to flows people have already built, and see
+[MAINTAINERS.md](MAINTAINERS.md#how-a-release-happens) for which version bump that deserves.
 
 ### Releasing
 
-A release is one tag on main. Pushing it builds the piece from that commit and publishes the result.
-Nothing is built by hand, and nothing is uploaded to a release by hand.
-
-#### Choosing the version
-
-`packages/orocommerce/package.json` holds the version. Bump it in the pull request that makes the
-change, not at tag time:
-
-- **major** when a flow somebody has already built can break: an action or a trigger removed or
-  renamed, a new required prop, a prop whose type changed, output a flow reads that is no longer
-  there.
-- **minor** for a new action or trigger, or a new optional prop.
-- **patch** for a fix that leaves the piece's surface as it was.
-
-A pin bump is the case that needs a decision. Moving `.ap-pin` can change the props of the shared
-HTTP action without a line of this repository changing, and `npm run metadata:write` puts that
-change in the diff of the bump's own pull request. Read that diff: a changed prop type or a required
-field that became optional is a major bump, a new optional prop is a minor one, and a pin bump that
-leaves `metadata.snapshot.json` untouched is a patch. The snapshot tells you what moved; which bump
-that deserves is still a judgement somebody has to make.
-
-#### Cutting the release
-
-Merge the version bump first, then tag the merge commit on main:
-
-```sh
-git checkout main && git pull
-git tag v1.2.3
-git push origin v1.2.3
-```
-
-The tag must be exactly `v` plus the version in `packages/orocommerce/package.json`, and the commit
-it points at must be on main. `.github/workflows/release.yml` checks both before it builds anything,
-so a tag pushed from a branch, or one that names a version nobody merged, fails in seconds.
-
-It then:
-
-1. builds the piece with the same composite action CI uses, so the tag runs lint, the test suite,
-   the translation check, the check that the fetched Activepieces tree is unmodified, the checks on
-   the packed artifact and the metadata snapshot;
-2. writes the release notes, which record the tag, the tagged commit, the `.ap-pin` commit, the
-   sha256 of the `.tgz` and the sha256 of `package/src/index.js` inside it. Those five together are
-   what identifies a release: most of what ships in the artifact is inlined from Activepieces at the
-   pinned commit, so the commit of this repository does not on its own say what somebody downloaded;
-3. creates the GitHub release for the tag, with the `.tgz` attached and those notes. If a release
-   for that tag already exists, it stops and changes nothing;
-4. publishes to npm, if publishing is switched on.
-
-`npm run release:notes` writes the same notes locally from whatever is in `artifacts/`, which is the
-way to see what a release would say before cutting one.
-
-#### Turning on npm publishing
-
-Publishing is off. Until it is switched on, a tag produces a GitHub release with the `.tgz` attached
-and nothing else, which is a complete way to ship the piece: Activepieces installs a piece from a
-packed tarball.
-
-No npm token is stored in this repository. A trusted publisher can only be configured in the
-settings of a package that already exists on npm, and this package is not on npm yet
-([npm docs](https://docs.npmjs.com/trusted-publishers/), [npm/cli#8544](https://github.com/npm/cli/issues/8544)),
-so 1.0.0 is published once by hand by an `@oroinc` npm maintainer, from the `.tgz` attached to its
-GitHub release. Trusted publishing is configured on the package after that, and from the next version
-a tag publishes by itself once a repository admin sets the Actions variable `NPM_PUBLISH_ENABLED` to
-`true`. [MAINTAINERS.md](MAINTAINERS.md#who-can-publish) has the steps and who does them.
-
-The publish step runs `npm publish --provenance --access public` on the exact `.tgz` the release
-carries, and it asks npm for the version first: if `@oroinc/piece-orocommerce@<version>` is already
-there, it skips. Nothing in the workflow has to change for trusted publishing: npm authenticates the
-run through the `id-token` permission the job already has, given a new enough npm on the runner.
-
-#### A published version is final
-
-Published means on npm. A version that reached npm is never rebuilt and never republished:
-re-running the workflow on an existing tag changes nothing, and moving a tag does not move what npm
-already has. If a published version is wrong, the fix is the next version.
-
-A GitHub release of a version that never reached npm is not final in that sense and may be deleted
-and cut again; see [MAINTAINERS.md](MAINTAINERS.md#how-a-release-happens).
+A release is one tag on `main`, and the workflow builds and publishes what that tag points at.
+The version rule, the CHANGELOG entry, the tagging steps and who publishes to npm are in
+[MAINTAINERS.md](MAINTAINERS.md#how-a-release-happens).
 
 ### Layout
 
@@ -248,7 +159,7 @@ MAINTAINERS.md             who maintains this, how to build it, how a release is
 packages/orocommerce/      the piece, and the package that is published
 packages/orocommerce/README.md   the npm page; the only document that ships in the package
 packages/orocommerce/CHANGELOG.md  what changed in each version
-packages/orocommerce/INTERNALS.md  notes for anyone changing the code under src/
+packages/orocommerce/ARCHITECTURE.md  how the piece is built and why
 packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
 ```
 

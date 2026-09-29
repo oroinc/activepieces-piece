@@ -33,7 +33,7 @@ npm run ap:fetch       # sparse checkout of Activepieces at the commit in .ap-pi
 npm run lint
 npm run bundle         # bundles with @activepieces/cli and packs artifacts/*.tgz
 npm run ap:check-clean # asserts the fetched upstream tree is untouched
-npm test               # 7 suites, 97 tests
+npm test               # the vitest suites
 npm run i18n:check     # needs the bundle: it reads the built piece for the strings it exposes
 npm run verify         # checks the packed .tgz loads standalone with the expected surface
 npm run metadata:check # compares the piece's surface with the committed snapshot
@@ -46,7 +46,7 @@ fetches first if `.ap-src` is missing or at the wrong commit, so it is safe to r
 The build fetches Activepieces because the piece is compiled against
 `@activepieces/pieces-framework` and `@activepieces/pieces-common`, whose npm copies lag a long way
 behind the engine. `README.md` explains the fetch, the pin in `.ap-pin` and how to bump it;
-`packages/orocommerce/INTERNALS.md` explains the piece's own code.
+`packages/orocommerce/ARCHITECTURE.md` explains how the piece itself is built.
 
 ## How a release happens
 
@@ -60,6 +60,14 @@ Handing that artifact to npm is a separate step, and for 1.0.0 it is done once b
    already built can break (an action or trigger removed or renamed, a new required prop, a prop
    whose type changed, output a flow reads that is no longer there), **minor** for a new action,
    trigger or optional prop, **patch** for a fix that leaves the piece's surface as it was.
+
+   A pin bump is the case that needs a decision, because moving `.ap-pin` can change the props of
+   the shared HTTP action with no line of this repository changing.
+   `packages/orocommerce/metadata.snapshot.json` is what tells you: run `npm run metadata:write` in
+   the bump's own pull request and read the diff. A changed prop type or a required field that
+   became optional is a major bump, a new optional prop is a minor one, and a bump that leaves the
+   snapshot untouched is a patch. The snapshot says what moved; which bump that deserves is still a
+   judgement somebody has to make.
 2. **Add the CHANGELOG entry in the same pull request as the bump**, in
    `packages/orocommerce/CHANGELOG.md`: a `## <version>` heading at the top, `* ` bullets, newest
    first, with the Jira key inline where there is one.

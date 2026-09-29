@@ -16,7 +16,10 @@ runs against the OroCommerce back-office JSON:API.
 
 ## Install
 
-Installing a piece is a platform admin action, on an instance running Activepieces 0.92.0 or later.
+Installing a piece is a platform admin action. Oro builds, tests and supports the piece on
+Activepieces 0.92.0 and later. The piece itself declares a lower floor, so an older instance will
+install it without complaint, but the shared Custom API Call action differs below 0.92.0 and those
+versions are not supported.
 
 Sign in as a platform admin, open **Platform Setup → Pieces**, and click **Install Piece**. In the
 **Install a piece** dialog:

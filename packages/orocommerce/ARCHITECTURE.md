@@ -1,14 +1,15 @@
-# OroCommerce piece internals
+# OroCommerce piece architecture
 
-Notes for anyone changing the code under `src/`. They are not shipped in the npm package; the
-package ships [README.md](README.md) only.
+How the piece is built and why, and the invariants that break if they are ignored. It is for anyone
+changing the code under `src/`, and is not part of the published package, which carries only
+`README.md`, `LICENSE` and `NOTICE`.
 
 Keep comments in the code short; longer explanations live here. The code keeps section markers and
 a handful of short why-comments, and anything longer belongs in a section below - read the relevant
 one before changing anything under `src/`. Most of them exist because of a bug that is easy to
 reintroduce.
 
-Who maintains this repository, how to build it and how a release is cut are in
+Who maintains this repository, how to build and test it, and how a release is cut are in
 [MAINTAINERS.md](../../MAINTAINERS.md).
 
 ## How it talks to Oro
