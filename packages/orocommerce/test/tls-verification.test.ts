@@ -6,12 +6,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { Agent } from 'undici';
+
 import { AppConnectionType } from '@activepieces/pieces-framework';
 import { HttpMethod } from '@activepieces/pieces-common';
 import { oroApiCall } from '../src/lib/common';
+import { requestOptionsWithTlsVerification } from '../src/lib/common/tls';
 
 const PACKAGE_ROOT = join(__dirname, '..');
 const BUNDLE = join(PACKAGE_ROOT, 'dist', 'src', 'index.js');
+const UNDICI_VERSION = JSON.parse(
+  readFileSync(join(PACKAGE_ROOT, '..', '..', 'node_modules', 'undici', 'package.json'), 'utf8')
+).version as string;
 
 let certDir = '';
 
@@ -118,6 +124,56 @@ describe('certificate verification survives a worker that turned it off', () => 
     });
 
     expect(response.status).toBe(200);
+  });
+});
+
+/**
+ * The piece hands Node's own `fetch` a dispatcher built by the `undici` in its bundle, and the two
+ * are separate copies of the library. They agree today, but they are versioned apart: undici 8
+ * reworked the handler interface, and a dispatcher built by it is refused by every Node released so
+ * far with `UND_ERR_INVALID_ARG`. That would take certificate verification down at runtime, on the
+ * first request a flow makes, with nothing failing at build time to warn anyone.
+ *
+ * So the pairing is exercised here rather than assumed. Versions are deliberately not compared: the
+ * piece is on undici 7 while Node 20 and 22 bundle undici 6, and that combination is fine. Only the
+ * real request can say.
+ */
+describe('the dispatcher is one this Node accepts', () => {
+  const versions = () =>
+    `piece undici ${UNDICI_VERSION}, Node ${process.version} bundling undici ${process.versions.undici}`;
+
+  it('is honoured by the global fetch, rather than refused or ignored', async () => {
+    const { cert, key, ca } = issueCertificates();
+    const server = createHttpsServer({ cert: readFileSync(cert), key: readFileSync(key) },
+      (_req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}'); });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as { port: number };
+
+    try {
+      // Trusted through the dispatcher rather than the environment, so no restart is needed.
+      const trusting = new Agent({ connect: { rejectUnauthorized: true, ca: readFileSync(ca) } });
+      const response = await fetch(`https://localhost:${port}/`, {
+        dispatcher: trusting,
+      } as RequestInit);
+
+      expect(response.status, `a valid chain should be accepted (${versions()})`).toBe(200);
+    } catch (error) {
+      const code = (error as { cause?: { code?: string } }).cause?.code;
+      throw new Error(
+        code === 'UND_ERR_INVALID_ARG'
+          ? `Node refused the dispatcher this piece builds, so certificate verification would be off at runtime (${versions()}). Align the undici dependency with a major this Node accepts.`
+          : `the request failed with ${code ?? String(error)} (${versions()})`
+      );
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('is what the piece actually sends, and it carries rejectUnauthorized', () => {
+    const dispatcher = requestOptionsWithTlsVerification().dispatcher;
+
+    expect(dispatcher, `no dispatcher is attached to outgoing requests (${versions()})`).toBeDefined();
+    expect(typeof (dispatcher as { dispatch?: unknown }).dispatch).toBe('function');
   });
 });
 

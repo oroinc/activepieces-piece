@@ -127,12 +127,12 @@ export function parseHeaderJson({ raw }: { raw: string }): Record<string, string
     parsed = JSON.parse(raw);
   } catch {
     throw new Error(
-      'Default HTTP Headers is not valid JSON. Expected an object, for example {"X-Include": "totalCount"}.'
+      'Default HTTP Headers is not valid JSON, expected an object such as {"X-Include": "totalCount"}.'
     );
   }
   if (!isRecord(parsed)) {
     throw new Error(
-      'Default HTTP Headers must be a JSON object, for example {"X-Include": "totalCount"}.'
+      'Default HTTP Headers must be a JSON object such as {"X-Include": "totalCount"}.'
     );
   }
   return toHeaderRecord({ value: parsed });

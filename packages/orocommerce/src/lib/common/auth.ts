@@ -45,8 +45,7 @@ Authenticate to OroCommerce APIs using OAuth 2.0 Client Credentials.
     headers: Property.LongText({
       displayName: 'Default HTTP Headers',
       description:
-        'JSON object of HTTP headers sent with every action. A header set on the step wins. ' +
-        'An Authorization header is ignored: this connection always sends its own bearer token.',
+        'JSON object of headers sent with every action. Step headers win. Authorization is ignored.',
       required: false
     }),
     isInternalInfrastructure: Property.Checkbox({

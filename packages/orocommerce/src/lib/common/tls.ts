@@ -19,9 +19,12 @@ import type { SendRequestOptions } from '@activepieces/pieces-common';
  * whatever the variable happens to say at that moment.
  *
  * Node's fetch takes that as an undici Dispatcher under `dispatcher`, which is why undici is a
- * dependency. It has to stay on the major Node bundles (7.x for Node 24): a dispatcher built by a
- * different major is rejected with UND_ERR_INVALID_ARG, because the handler interface it implements
- * is not the one Node's own copy of undici calls.
+ * dependency. The version needs care, though not version matching: undici 6 and 7 are both accepted
+ * by Node 20, 22 and 24, whichever of the two those Node versions bundle themselves. undici 8 is
+ * not. It reworked the handler interface, so a dispatcher built by it is refused with
+ * UND_ERR_INVALID_ARG by every Node released so far, and the piece would lose certificate
+ * verification on the first request a flow makes. test/tls-verification.test.ts sends a real request
+ * through the global fetch to keep that from reaching a release.
  *
  * The patch below is what reaches upstream's shared HTTP action. createCustomApiCallAction builds
  * its request internally and calls sendRequest with no options, so there is no argument to pass a
