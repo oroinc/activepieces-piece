@@ -207,6 +207,7 @@
   "Password for the new account. Prefer a value from a secret store over a literal one.": "Password for the new account. Prefer a value from a secret store over a literal one.",
   "Honorific (e.g. Mr., Ms., Dr.).": "Honorific (e.g. Mr., Ms., Dr.).",
   "Suffix (e.g. PhD, Jr.).": "Suffix (e.g. PhD, Jr.).",
+  "The website this customer user is associated with. OroCommerce Enterprise rejects a create without it; the Community Edition leaves it optional.": "The website this customer user is associated with. OroCommerce Enterprise rejects a create without it; the Community Edition leaves it optional.",
   "When disabled the user cannot log into the storefront. Defaults to true, so the account is active as soon as it is created.": "When disabled the user cannot log into the storefront. Defaults to true, so the account is active as soon as it is created.",
   "Marks the account confirmed without sending a confirmation email. Defaults to true.": "Marks the account confirmed without sending a confirmation email. Defaults to true.",
   "Birth date in YYYY-MM-DD format.": "Birth date in YYYY-MM-DD format.",
