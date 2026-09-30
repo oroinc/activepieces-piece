@@ -63,7 +63,12 @@ export const createCustomerUserAction = createAction({
 
     // -- Required relationships ------------------------------------------------
     customer: customerRequiredDropdown,
-    website: websiteDropdown,
+    website: {
+      ...websiteDropdown,
+      description:
+        'The website this customer user is associated with. OroCommerce Enterprise rejects a ' +
+        'create without it; the Community Edition leaves it optional.',
+    },
 
     // -- Optional attributes ---------------------------------------------------
     enabled: Property.Checkbox({
