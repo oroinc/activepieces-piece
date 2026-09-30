@@ -24,7 +24,8 @@ npm run verify          # checks the packed .tgz
 npm run metadata:check  # compares the piece's surface with metadata.snapshot.json
 ```
 
-`npm run metadata:write` and `npm run i18n:write` regenerate the snapshot and the translation files.
+`npm run metadata:write` and `npm run i18n:write` regenerate the snapshot and the English
+translation source.
 Run them only for a change that is meant to move them, and review the diff.
 
 ## Release
