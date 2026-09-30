@@ -154,10 +154,14 @@ The wrapper is what reaches `Custom API Call`: `createCustomApiCallAction` build
 internally and calls `sendRequest` with no options, so there is no argument to pass a dispatcher
 through.
 
-`undici` is pinned to `7.30.0` and must track the major Node bundles. A dispatcher built by a
-different major is rejected with `UND_ERR_INVALID_ARG`, because the handler interface it implements
-is not the one Node's own copy of undici calls. It is bundled into the artifact, since the
-Activepieces image has no resolvable `undici` of its own.
+`undici` is pinned to `7.30.0` and bundled into the artifact, since the Activepieces image has no
+resolvable `undici` of its own. The version needs care, though not version matching: undici 6 and 7
+are both accepted by Node 20, 22 and 24, whichever of the two those Node versions bundle themselves.
+undici 8 is not. It reworked the handler interface, so a dispatcher built by it is refused with
+`UND_ERR_INVALID_ARG` by every Node released so far, and the piece would lose certificate
+verification on the first request a flow makes. `test/tls-verification.test.ts` sends a real request
+through the global `fetch` rather than comparing versions, and CI runs the suite on Node 20 and on
+Node 24, so a mismatch fails the build.
 
 ## Dropdowns and paging
 
