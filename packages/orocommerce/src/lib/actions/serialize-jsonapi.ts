@@ -11,7 +11,9 @@ export const serializeJsonApiAction = createAction({
   name: 'serialize_jsonapi',
   displayName: 'Serialize JSON:API Request',
   description:
-    'Builds a JSON:API request body from a plain object, ready for the Request Body of the API Call action.',
+    'Builds a JSON:API request body from a plain object, ready for the Request Body of the API Call action. ' +
+    'A "_meta" object on a record is sent as that record\'s JSON:API meta, so {"update": true} on an ' +
+    'embedded record updates the existing record instead of creating a new one.',
   auth: undefined,
   props: {
     resourceType: Property.ShortText({
