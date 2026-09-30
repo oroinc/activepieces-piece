@@ -140,8 +140,8 @@ export const oroWebhookTopicTrigger = createTrigger({
       }
 
       console.warn(
-        `${describeDelivery(context)}: signing is on but no signing secret is stored. ` +
-          'Disable and re-enable the flow to register a new webhook and secret in OroCommerce.'
+        `${describeDelivery(context)}: signing is on but no signing secret is stored, ` +
+          'so disable and re-enable the flow to register a new webhook and secret in OroCommerce.'
       );
       return [];
     }
@@ -201,8 +201,8 @@ async function discardWebhook({
     // registration, and failing here would leave the caller worse off. It is still reported, so a
     // registration left behind in Oro is visible in the logs instead of silently accumulating.
     console.warn(
-      `OroCommerce webhook ${webhookId} could not be removed: ${formatError({ error })}. ` +
-        'Delete it in OroCommerce under System > Integrations > Webhooks.'
+      `OroCommerce webhook ${webhookId} could not be removed, so delete it under ` +
+        `System > Integrations > Webhooks: ${formatError({ error })}`
     );
   }
 }
