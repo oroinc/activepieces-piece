@@ -1,6 +1,6 @@
 import { PieceAuth, Property } from '@activepieces/pieces-framework';
 import { HttpMethod, HttpResponse, HttpMessageBody } from '@activepieces/pieces-common';
-import { oroApiCall } from './client';
+import { oroApiCall, parseHeaderJson } from './client';
 import { AppConnectionType, tryCatch } from '@activepieces/pieces-framework';
 
 export const oroAuth = PieceAuth.CustomAuth({
@@ -45,8 +45,8 @@ Authenticate to OroCommerce APIs using OAuth 2.0 Client Credentials.
     headers: Property.LongText({
       displayName: 'Default HTTP Headers',
       description:
-        'JSON object of HTTP headers sent with every action. A header set on the step wins; ' +
-        'Authorization is always managed by this connection.',
+        'JSON object of HTTP headers sent with every action. A header set on the step wins. ' +
+        'An Authorization header is ignored: this connection always sends its own bearer token.',
       required: false
     }),
     isInternalInfrastructure: Property.Checkbox({
@@ -60,6 +60,16 @@ Authenticate to OroCommerce APIs using OAuth 2.0 Client Credentials.
   },
 
   validate: async ({ auth }): Promise<{ valid: true } | { valid: false; error: string }> => {
+    // Checked before the credentials: unparseable header JSON used to be dropped without a word, so
+    // the connection saved as valid and every later call went out without the headers it listed.
+    if (auth.headers && auth.headers.trim() !== '') {
+      try {
+        parseHeaderJson({ raw: auth.headers });
+      } catch (error: unknown) {
+        return { valid: false, error: (error as Error).message };
+      }
+    }
+
     const { error } = await tryCatch<HttpResponse<HttpMessageBody>>(() =>
       oroApiCall({
         method: HttpMethod.GET,
