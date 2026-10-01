@@ -260,7 +260,7 @@ its strings from; there are no per-locale files, and `i18n:check` fails if one a
 Activepieces would load it as a translation.
 
 ```bash
-npm run build && npm run i18n:write   # regenerates translation.json
+npm run bundle && npm run i18n:write --prefix packages/orocommerce   # regenerates translation.json
 ```
 
 `i18n:write` is the only generator this repository has, and it needs the built piece, so run the

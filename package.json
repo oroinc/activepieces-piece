@@ -10,6 +10,7 @@
   "scripts": {
     "ap:fetch": "node scripts/fetch-ap.mjs",
     "ap:check-clean": "node scripts/check-ap-clean.mjs",
+    "dev:ap": "node scripts/dev-ap.mjs",
     "bundle": "node scripts/bundle.mjs",
     "verify": "node scripts/verify-artifact.mjs",
     "release:notes": "node scripts/release-notes.mjs",

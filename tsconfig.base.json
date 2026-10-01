@@ -23,5 +23,5 @@
       "@activepieces/core-utils": [".ap-src/packages/core/utils/src/index.ts"]
     }
   },
-  "exclude": ["node_modules", ".ap-src", "artifacts"]
+  "exclude": ["node_modules", ".ap-src", ".ap-dev", ".ap-dev-fork", "artifacts"]
 }

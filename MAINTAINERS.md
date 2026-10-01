@@ -29,6 +29,31 @@ npm run metadata:check  # compares the piece's surface with metadata.snapshot.js
 snapshot and the English translation source.
 Run them only for a change that is meant to move them, and review the diff.
 
+## Local development
+
+Runs the piece inside a real Activepieces, with no Docker and no image rebuild.
+
+Prerequisites, all three checked before anything is downloaded: Node 22.15+ or 24 (Activepieces
+accepts nothing else), bun 1.3.14 or newer, and deno on PATH as a real binary from Homebrew or the
+official installer rather than npm - an npm shim exits 127 when the engine spawns it.
+
+```sh
+npm run dev:ap
+```
+
+The first run clones Activepieces at `.ap-pin` into git-ignored `.ap-dev/` and installs it: 1 to 15
+minutes depending on the network, and ~3 GB. Later runs reuse that checkout and are serving in about
+half a minute. Open http://localhost:4200 and sign in as `dev@ap.com` / `12345678` (seeded dev user,
+not a secret).
+
+Then edit `packages/orocommerce/src` as usual. Every save is mirrored into the checkout and rebuilt
+there, so a changed label or a changed return value shows up in about 10 seconds with no restart.
+The copy is one-way: only this repository is ever committed to.
+
+- `npm run dev:ap -- --fork` uses the fork's image branch in `.ap-dev-fork/` instead. For embed
+  testing only - that branch is not the pin.
+- `npm run dev:ap -- --reset` deletes `.ap-dev/` and `.ap-dev-fork/`, after you type `yes`.
+
 ## Upgrading Activepieces
 
 When moving `.ap-pin`, check the Node version of the Activepieces image the pin belongs to

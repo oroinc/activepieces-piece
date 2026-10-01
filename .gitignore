@@ -1,5 +1,7 @@
 node_modules/
 .ap-src/
+.ap-dev/
+.ap-dev-fork/
 artifacts/
 packages/orocommerce/dist/
 *.tgz
