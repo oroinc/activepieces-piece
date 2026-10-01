@@ -187,9 +187,7 @@ function isNodeShim(path) {
 }
 
 function checkDeno() {
-  const found = capture(process.platform === 'win32' ? 'where' : 'command', ['-v', 'deno'], {
-    shell: process.platform !== 'win32',
-  });
+  const found = capture(process.platform === 'win32' ? 'where' : 'which', ['deno']);
   const path = found ? found.split('\n')[0].trim() : null;
   if (!path) {
     die(
@@ -344,8 +342,10 @@ function writeEnvDev(checkoutDir) {
   let text = existsSync(envPath) ? readFileSync(envPath, 'utf8') : '';
   for (const [key, value] of ENV_SETTINGS) {
     const line = `${key}=${value}`;
-    const pattern = new RegExp(`^${key}=.*$`, 'm');
-    if (pattern.test(text)) {
+    // Every line for the key, not only the first: dotenv keeps the last one it reads, so a
+    // duplicate further down would otherwise win silently.
+    const pattern = new RegExp(`^${key}=.*$`, 'gm');
+    if (text.match(pattern)) {
       text = text.replace(pattern, line);
     } else {
       text += `${text.endsWith('\n') || text === '' ? '' : '\n'}${line}\n`;
