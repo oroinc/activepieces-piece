@@ -5,6 +5,12 @@ export interface JsonApiResource {
   id: string;
   attributes?: Record<string, unknown>;
   relationships?: Record<string, { data: Linkage | Linkage[] | null }>;
+  /**
+   * JSON:API meta for this resource. Oro reads it to decide what to do with an included record:
+   * without it the record is created, `{ update: true }` loads the existing one and fails with a
+   * 400 if there is none, `{ upsert: true }` takes either path.
+   */
+  meta?: Record<string, unknown>;
 }
 
 export interface JsonApiDocument {
@@ -42,7 +48,10 @@ export interface SerializeOptions {
   /**
    * Flat data object to serialize.
    *
-   * Classification rules (applied after skipping `_type` and `id`):
+   * A `_meta` object on a record is carried over to that record's JSON:API `meta` and is never
+   * sent as an attribute.
+   *
+   * Classification rules (applied after skipping `_type`, `id` and `_meta`):
    *  - Scalar (string | number | boolean | null) → `attributes`.
    *  - Any plain object → to-one `relationship`.
    *    Objects with `_type: null` (null-relationship sentinel) → `{ data: null }`.

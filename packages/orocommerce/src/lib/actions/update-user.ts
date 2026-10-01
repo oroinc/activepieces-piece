@@ -44,12 +44,6 @@ export const updateUserAction = createAction({
       description: 'Updated email address of the user.',
       required: false,
     }),
-    password: Property.ShortText({
-      displayName: 'Password',
-      description:
-        'New password for the account. Prefer a value from a secret store over a literal one.',
-      required: false,
-    }),
     firstName: Property.ShortText({
       displayName: 'First Name',
       required: false,
@@ -115,7 +109,6 @@ export const updateUserAction = createAction({
       ...jsonApiBodyUtils.pickDefined({
         username: p.username,
         email: p.email,
-        password: p.password,
         firstName: p.firstName,
         lastName: p.lastName,
         enabled: readBooleanUpdate(p.enabled),

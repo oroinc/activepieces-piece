@@ -1104,7 +1104,7 @@
     },
     "serialize_jsonapi": {
       "displayName": "Serialize JSON:API Request",
-      "description": "Builds a JSON:API request body from a plain object, ready for the Request Body of the API Call action.",
+      "description": "Builds a JSON:API request body from a plain object. Add \"_meta\": {\"update\": true} to an embedded record to update it instead of creating a new one.",
       "requireAuth": true,
       "type": null,
       "props": {
@@ -1391,13 +1391,6 @@
           "required": false,
           "defaultValue": null
         },
-        "password": {
-          "type": "SHORT_TEXT",
-          "displayName": "Password",
-          "description": "New password for the account. Prefer a value from a secret store over a literal one.",
-          "required": false,
-          "defaultValue": null
-        },
         "userRoles": {
           "type": "MULTI_SELECT_DROPDOWN",
           "displayName": "Roles (replaces all existing roles)",
@@ -1536,13 +1529,6 @@
           "type": "DROPDOWN",
           "displayName": "Business Unit",
           "description": "Search business units.",
-          "required": false,
-          "defaultValue": null
-        },
-        "password": {
-          "type": "SHORT_TEXT",
-          "displayName": "Password",
-          "description": "New password for the account. Prefer a value from a secret store over a literal one.",
           "required": false,
           "defaultValue": null
         },

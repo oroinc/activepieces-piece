@@ -37,12 +37,6 @@ export const updateCustomerUserAction = createAction({
       description: 'Updated email address of the customer user.',
       required: false,
     }),
-    password: Property.ShortText({
-      displayName: 'Password',
-      description:
-        'New password for the account. Prefer a value from a secret store over a literal one.',
-      required: false,
-    }),
 
     namePrefix: Property.ShortText({
       displayName: 'Name Prefix',
@@ -108,7 +102,6 @@ export const updateCustomerUserAction = createAction({
         email: p.email,
         firstName: p.firstName,
         lastName: p.lastName,
-        password: p.password,
         enabled: readBooleanUpdate(p.enabled),
         confirmed: readBooleanUpdate(p.confirmed),
         namePrefix: p.namePrefix,
