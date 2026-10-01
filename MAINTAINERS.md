@@ -29,6 +29,47 @@ npm run metadata:check  # compares the piece's surface with metadata.snapshot.js
 snapshot and the English translation source.
 Run them only for a change that is meant to move them, and review the diff.
 
+## Local development
+
+Runs the piece inside a real Activepieces, with no Docker and no image rebuild.
+
+Prerequisites, all checked before anything is downloaded: Node 22.15+ or 24 (Activepieces accepts
+nothing else), bun 1.3.14 or newer, deno on PATH, and ports 3000 and 4200 free. deno can come from
+Homebrew, the official installer or `npm install -g deno`; for the npm one, Activepieces skips the
+shim on PATH and uses the binary the package downloaded under `npm root -g`. With no deno on PATH at
+all, Activepieces would run `npm install -g deno` itself, so the script stops first.
+
+```sh
+npm run dev:ap
+```
+
+The first run clones Activepieces at `.ap-pin` into git-ignored `.ap-dev/` and installs it: 1 to 15
+minutes depending on the network, and ~3 GB. Later runs reuse that checkout and are serving in about
+half a minute. Open http://localhost:4200 and sign in as `dev@ap.com` / `12345678` (seeded dev user,
+not a secret).
+
+Both servers listen on all network interfaces (the API on `::`, the web app on `0.0.0.0:4200`,
+which proxies `/api`), and upstream commits the JWT secret in `.env.dev`, so anyone on the same
+network can sign in as platform admin. Use it only on a trusted network, and never connect it to
+customer or production Oro instances.
+
+Then edit `packages/orocommerce/src` as usual. Every save is mirrored into the checkout and rebuilt
+there, so a changed label or a changed return value shows up in about 10 seconds with no restart.
+The copy is one-way: only this repository is ever committed to. Restart `dev:ap` after changing
+`package.json` (new dependencies need `bun install`) or a tsconfig.
+
+Your own environment variables go in `.env.dev.local` at the repository root (git-ignored, one
+`KEY=value` per line), not in `.ap-dev/.env.dev`. Every run copies its lines into `.ap-dev/.env.dev`,
+where they replace upstream's value for the same key, and `--reset` keeps the file. Deleting a line
+does not bring upstream's value back; `git -C .ap-dev checkout -- .env.dev` does, on the next run.
+Shell exports do not work: turbo strips every variable its `globalPassThroughEnv` does not list,
+apart from system ones such as `PATH`. The few it lists pass through, and one of them exported in
+the shell wins over the file. Restart after editing. The script always sets `AP_DEV_PIECES` and
+`AP_REUSE_SANDBOX`, and ignores a line for either in `.env.dev.local`.
+
+- `npm run dev:ap -- --reset` deletes `.ap-dev/` after you type `yes`: the checkout, its `.env.dev`,
+  and the dev database with the flows and connections made in it. `.env.dev.local` is kept.
+
 ## Upgrading Activepieces
 
 When moving `.ap-pin`, check the Node version of the Activepieces image the pin belongs to

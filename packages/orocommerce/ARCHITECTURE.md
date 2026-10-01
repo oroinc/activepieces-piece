@@ -244,9 +244,10 @@ A rejected delivery returns `[]` with a `console.warn`: no run is created and Or
 ## Local development
 
 The toolchain lives at the repository root, and so do the commands: see
-[Building and testing](../../README.md#building-and-testing) in the root README, which also explains
-the fetch, the pin and how to bump it. `.github/workflows/ci.yml` runs exactly that sequence on every
-pull request and on every push to `main`.
+[Build and test](../../MAINTAINERS.md#build-and-test) in MAINTAINERS.md. `.github/workflows/ci.yml`
+runs exactly that sequence on every pull request and on every push to `main`. The root README
+explains [the fetch](../../README.md#why-the-build-fetches-activepieces) and
+[the pin and how to bump it](../../README.md#the-pin).
 
 `test/jsonapi-roundtrip.test.ts` guards the serialize/deserialize contract above,
 `test/line-items.test.ts` guards line-item validation, `test/body-utils.test.ts` guards the
@@ -260,7 +261,7 @@ its strings from; there are no per-locale files, and `i18n:check` fails if one a
 Activepieces would load it as a translation.
 
 ```bash
-npm run build && npm run i18n:write   # regenerates translation.json
+npm run bundle && npm run i18n:write --prefix packages/orocommerce   # regenerates translation.json
 ```
 
 `i18n:write` is the only generator this repository has, and it needs the built piece, so run the

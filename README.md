@@ -139,6 +139,7 @@ scripts/check-ap-clean.mjs   asserts .ap-src is unmodified at the pinned commit
 scripts/release-notes.mjs    the release identity written into the release notes
 scripts/notices.mjs          builds the NOTICE that ships in the package
 scripts/esbuild-metafile.cjs  makes the bundler hand back its metafile
+scripts/dev-ap.mjs         runs the piece in a local Activepieces dev server, in .ap-dev
 LICENSE                    the licence, copied into the package at build time
 MAINTAINERS.md             maintainers, build, release
 .github/actions/build-piece  the build and the checks, shared by CI and the release workflow
