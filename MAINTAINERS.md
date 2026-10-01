@@ -55,10 +55,7 @@ variable its `globalPassThroughEnv` does not list, apart from system ones such a
 lists pass through, and one of them exported in the shell wins over the file. Restart after
 editing. The script sets only `AP_DEV_PIECES` and `AP_REUSE_SANDBOX` and keeps every other line.
 
-- `npm run dev:ap -- --fork` uses the fork's image branch in `.ap-dev-fork/` instead. For embed
-  testing only - that branch is not the pin.
-- `npm run dev:ap -- --reset` deletes `.ap-dev/` and `.ap-dev-fork/`, `.env.dev` included, after
-  you type `yes`.
+- `npm run dev:ap -- --reset` deletes `.ap-dev/`, and `.env.dev` with it, after you type `yes`.
 
 ## Upgrading Activepieces
 

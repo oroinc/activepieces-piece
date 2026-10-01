@@ -37,19 +37,14 @@ const PIN_FILE = join(REPO_ROOT, '.ap-pin');
 const PIECE_DIR = join(REPO_ROOT, 'packages', 'orocommerce');
 
 const UPSTREAM = 'https://github.com/activepieces/activepieces.git';
-const FORK = 'https://github.com/oroinc/activepieces.git';
-const FORK_BRANCH = 'poc/orocommerce_prefixed-path-install';
 
 const DEV_DIR = join(REPO_ROOT, '.ap-dev');
-const FORK_DIR = join(REPO_ROOT, '.ap-dev-fork');
 
 /**
  * Upstream keeps custom pieces in packages/pieces/custom/* (an empty, already-globbed workspace
- * slot). The fork branch carries its own copy under packages/pieces/community/orocommerce, so on
- * --fork the copy goes there instead and replaces it.
+ * slot), so the copy goes there.
  */
 const DEV_PIECE_PATH = join('packages', 'pieces', 'custom', 'orocommerce');
-const FORK_PIECE_PATH = join('packages', 'pieces', 'community', 'orocommerce');
 
 /** Only these four are copied. Everything else in the piece is for this repository's own tooling. */
 const COPIED = ['package.json', 'src', 'tsconfig.json', 'tsconfig.lib.json'];
@@ -60,21 +55,15 @@ const PIECE_FOLDER = 'orocommerce';
 const MIN_BUN = '1.3.14';
 const WATCH_DEBOUNCE_MS = 200;
 
+const VALID_FLAGS = ['--reset'];
+
 const args = process.argv.slice(2);
-const useFork = args.includes('--fork');
+const unknownArgs = args.filter((arg) => !VALID_FLAGS.includes(arg));
 const doReset = args.includes('--reset');
 
 function die(message) {
   console.error(`\n${message}\n`);
   process.exit(1);
-}
-
-function banner(lines) {
-  const width = Math.max(...lines.map((line) => line.length)) + 6;
-  const rule = '*'.repeat(width);
-  console.log(`\n${rule}`);
-  for (const line of lines) console.log(`*  ${line.padEnd(width - 6)}  *`);
-  console.log(`${rule}\n`);
 }
 
 function run(command, cmdArgs, options = {}) {
@@ -217,20 +206,18 @@ function headOf(dir) {
   return capture('git', ['-C', dir, 'rev-parse', 'HEAD']);
 }
 
-function ensureCheckout({ dir, label, url, pin, branch }) {
+function ensureCheckout({ dir, label, url, pin }) {
   if (existsSync(dir)) {
     if (!existsSync(join(dir, '.git'))) {
       die(`${label} exists but is not a git checkout. Delete it and run again:\n  rm -rf ${dir}`);
     }
-    if (pin) {
-      const head = headOf(dir);
-      if (head !== pin) {
-        die(
-          `${label} is at ${head}, but .ap-pin says ${pin}.\n` +
-            'Nothing is re-checked-out automatically, because the tree may hold work in progress.\n' +
-            `Delete it and run again:\n  npm run dev:ap -- --reset\nor\n  rm -rf ${dir}`
-        );
-      }
+    const head = headOf(dir);
+    if (head !== pin) {
+      die(
+        `${label} is at ${head}, but .ap-pin says ${pin}.\n` +
+          'Nothing is re-checked-out automatically, because the tree may hold work in progress.\n' +
+          `Delete it and run again:\n  npm run dev:ap -- --reset\nor\n  rm -rf ${dir}`
+      );
     }
     console.log(`${label}: reusing the existing checkout.`);
     return false;
@@ -241,11 +228,8 @@ function ensureCheckout({ dir, label, url, pin, branch }) {
       'and about 3 GB once installed.'
   );
   const started = Date.now();
-  const cloneArgs = ['clone', '--filter=blob:none'];
-  if (branch) cloneArgs.push('--branch', branch, '--single-branch');
-  cloneArgs.push(url, dir);
-  run('git', cloneArgs);
-  if (pin) run('git', ['-C', dir, 'checkout', '--quiet', pin]);
+  run('git', ['clone', '--filter=blob:none', url, dir]);
+  run('git', ['-C', dir, 'checkout', '--quiet', pin]);
   const seconds = ((Date.now() - started) / 1000).toFixed(0);
   console.log(`${label}: cloned in ${seconds}s. The install below adds roughly 2.5 GB more.`);
   return true;
@@ -407,9 +391,9 @@ function startWatcher(copyDir) {
 // ---------------------------------------------------------------------------
 
 async function reset() {
-  const targets = [DEV_DIR, FORK_DIR].filter((dir) => existsSync(dir));
+  const targets = [DEV_DIR].filter((dir) => existsSync(dir));
   if (targets.length === 0) {
-    console.log('Nothing to delete: neither .ap-dev/ nor .ap-dev-fork/ exists.');
+    console.log('Nothing to delete: .ap-dev/ does not exist.');
     return;
   }
   console.log('This will permanently delete:');
@@ -452,6 +436,13 @@ function start(checkoutDir, stopWatcher) {
 }
 
 async function main() {
+  if (unknownArgs.length > 0) {
+    die(
+      `Unknown option: ${unknownArgs.join(' ')}\n` +
+        `Valid flags: ${VALID_FLAGS.join(', ')}. Run with no flags to start Activepieces.`
+    );
+  }
+
   if (doReset) {
     await reset();
     return;
@@ -462,21 +453,12 @@ async function main() {
   checkDeno();
 
   const pin = readPin();
-  const checkoutDir = useFork ? FORK_DIR : DEV_DIR;
+  const checkoutDir = DEV_DIR;
 
-  if (useFork) {
-    banner([
-      'embed testing only - fork branch, not the pin',
-      FORK_BRANCH,
-      'Nothing here is ever pushed. Use the default mode for normal work.',
-    ]);
-    ensureCheckout({ dir: FORK_DIR, label: '.ap-dev-fork', url: FORK, branch: FORK_BRANCH });
-  } else {
-    console.log(`Activepieces pin: ${pin}`);
-    ensureCheckout({ dir: DEV_DIR, label: '.ap-dev', url: UPSTREAM, pin });
-  }
+  console.log(`Activepieces pin: ${pin}`);
+  ensureCheckout({ dir: DEV_DIR, label: '.ap-dev', url: UPSTREAM, pin });
 
-  const copyDir = join(checkoutDir, useFork ? FORK_PIECE_PATH : DEV_PIECE_PATH);
+  const copyDir = join(checkoutDir, DEV_PIECE_PATH);
   const isNewCopy = copyPiece(copyDir);
   console.log(`Piece copied into ${relative(REPO_ROOT, copyDir)}${isNewCopy ? ' (new)' : ''}.`);
 
