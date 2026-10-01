@@ -19,6 +19,8 @@ import {
   type FetchCollectionParams,
 } from './types';
 import { jsonApiBodyUtils } from './jsonapi';
+// Imported for its side effect: installing it here covers every caller of the shared client.
+import './tls';
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 const inFlightTokenRequests = new Map<string, Promise<string>>();
@@ -40,9 +42,24 @@ export function formatError({ error }: { error: unknown }): string {
     return `OroCommerce API Error (${status}): ${detail}`;
   }
   if (error instanceof Error) {
-    return `OroCommerce API Error: ${error.message}`;
+    return `OroCommerce API Error: ${error.message}${describeCause({ error })}`;
   }
   return `OroCommerce API Error: ${String(error)}`;
+}
+
+/**
+ * fetch reports every transport failure as "fetch failed" and puts what actually happened on the
+ * cause. A rejected certificate is the case that matters most here: without this, the whole message
+ * is "fetch failed", which says nothing about what to fix.
+ */
+function describeCause({ error }: { error: Error }): string {
+  const cause = (error as { cause?: unknown }).cause;
+  if (!(cause instanceof Error)) {
+    return '';
+  }
+  const code = (cause as { code?: unknown }).code;
+  const detail = typeof code === 'string' && code !== '' ? `${code}: ${cause.message}` : cause.message;
+  return detail ? ` (${detail})` : '';
 }
 
 function getOroServerUrl(auth: OroAuth): string {
@@ -97,16 +114,36 @@ export async function getAccessToken({ auth }: { auth: OroAuth }): Promise<strin
   return request;
 }
 
+/**
+ * Parse the connection's Default HTTP Headers, or say why it cannot be done.
+ *
+ * This used to swallow the failure and return {}, so a typo in the JSON meant the headers were
+ * quietly dropped and every call went out without them - with nothing to show for it until someone
+ * compared a request against what they had configured.
+ */
+export function parseHeaderJson({ raw }: { raw: string }): Record<string, string> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      'Default HTTP Headers is not valid JSON, expected an object such as {"X-Include": "totalCount"}.'
+    );
+  }
+  if (!isRecord(parsed)) {
+    throw new Error(
+      'Default HTTP Headers must be a JSON object such as {"X-Include": "totalCount"}.'
+    );
+  }
+  return toHeaderRecord({ value: parsed });
+}
+
 export function getConnectionHeaders({ auth }: { auth: OroAuth }): Record<string, string> {
   const raw = auth.props.headers;
-  if (!raw) {
+  if (!raw || raw.trim() === '') {
     return {};
   }
-  try {
-    return toHeaderRecord({ value: JSON.parse(raw) });
-  } catch {
-    return {};
-  }
+  return parseHeaderJson({ raw });
 }
 
 export function toHeaderRecord({ value }: { value: unknown }): Record<string, string> {
@@ -114,7 +151,25 @@ export function toHeaderRecord({ value }: { value: unknown }): Record<string, st
     return {};
   }
 
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, String(item)]));
+  return withoutAuthorization({
+    headers: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, String(item)])),
+  });
+}
+
+/**
+ * The bearer token is the connection's to send. An Authorization header coming from the connection
+ * defaults or from a step used to reach the request after the token was applied and replace it, so
+ * the call went out as whoever the step said - while the field described it as always managed by the
+ * connection. Dropping the key here makes that description true.
+ */
+function withoutAuthorization({
+  headers,
+}: {
+  headers: Record<string, string>;
+}): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([key]) => key.toLowerCase() !== 'authorization')
+  );
 }
 
 export async function oroApiCall({
@@ -132,9 +187,15 @@ export async function oroApiCall({
       url: `${getOroAdminApiBaseUrl({ auth })}/${resourceUri.replace(/^\/+/, '')}`,
       headers: {
         'Content-Type': 'application/vnd.api+json',
-        ...getConnectionHeaders({ auth }),
-        ...getInternalInfrastructureHeaders({ auth }),
-        ...extraHeaders,
+        // Stripped once more over the merged set: the shared client applies `authentication` first
+        // and then spreads these over it, so an Authorization key surviving here would win.
+        ...withoutAuthorization({
+          headers: {
+            ...getConnectionHeaders({ auth }),
+            ...getInternalInfrastructureHeaders({ auth }),
+            ...extraHeaders,
+          },
+        }),
       },
       authentication: {
         type: AuthenticationType.BEARER_TOKEN,
@@ -232,7 +293,7 @@ async function requestAccessToken({
   return token;
 }
 
-function invalidateAccessToken({ auth, token }: { auth: OroAuth; token: string }): void {
+export function invalidateAccessToken({ auth, token }: { auth: OroAuth; token: string }): void {
   const cacheKey = buildCacheKey({ auth });
   if (tokenCache.get(cacheKey)?.token === token) {
     tokenCache.delete(cacheKey);

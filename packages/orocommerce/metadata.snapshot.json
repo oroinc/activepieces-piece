@@ -39,7 +39,7 @@
       "headers": {
         "type": "LONG_TEXT",
         "displayName": "Default HTTP Headers",
-        "description": "JSON object of HTTP headers sent with every action. A header set on the step wins; Authorization is always managed by this connection.",
+        "description": "JSON object of headers sent with every action. Step headers win. Authorization is ignored.",
         "required": false,
         "defaultValue": null
       },
@@ -76,7 +76,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -182,7 +182,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -330,7 +330,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -527,7 +527,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -878,7 +878,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1176,7 +1176,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1282,7 +1282,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1430,7 +1430,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },

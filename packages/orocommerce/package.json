@@ -28,7 +28,8 @@
     "@activepieces/pieces-common": "workspace:*",
     "@activepieces/pieces-framework": "workspace:*",
     "@activepieces/core-piece-types": "workspace:*",
-    "@activepieces/core-utils": "workspace:*"
+    "@activepieces/core-utils": "workspace:*",
+    "undici": "7.30.0"
   },
   "scripts": {
     "build": "node ../../scripts/bundle.mjs",

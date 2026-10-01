@@ -11,7 +11,8 @@ Every pull request is reviewed by the one who did not write it (`.github/CODEOWN
 
 ## Build and test
 
-Node 20 or later.
+Node 20 or later. CI runs everything below on Node 20 and on Node 24, the version the Activepieces
+image runs.
 
 ```sh
 npm ci
@@ -26,6 +27,15 @@ npm run metadata:check  # compares the piece's surface with metadata.snapshot.js
 
 `npm run metadata:write` and `npm run i18n:write` regenerate the snapshot and the translation files.
 Run them only for a change that is meant to move them, and review the diff.
+
+## Upgrading Activepieces
+
+When moving `.ap-pin`, check the Node version of the Activepieces image the pin belongs to
+(`Dockerfile` in the fetched tree) and make sure `undici` in `packages/orocommerce/package.json` is
+still a major that Node's own `fetch` accepts a dispatcher from - 6 and 7 are, 8 is not on any Node
+released so far, and a refused dispatcher silently turns certificate verification off.
+`test/tls-verification.test.ts` proves the pairing with a real request, and CI runs the suite on both
+Node 20 and Node 24, so a mismatch fails the build rather than the first flow.
 
 ## Release
 

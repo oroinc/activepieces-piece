@@ -762,7 +762,9 @@ export const additionalRelationsProp = Property.Json({
 
 export const additionalHeadersProp = Property.Object({
   displayName: 'Additional Headers',
-  description: 'Headers for this step; override the connection defaults. Example: {"X-Include": "totalCount"}',
+  description:
+    'Headers for this step; override the connection defaults. Authorization is ignored. ' +
+    'Example: {"X-Include": "totalCount"}',
   required: false,
   defaultValue: {},
 });
