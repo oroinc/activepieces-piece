@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpMethod } from '@activepieces/pieces-common';
+import { HttpError, HttpMethod } from '@activepieces/pieces-common';
 import { oroApiCall } from '../src/lib/common';
 import { oroWebhookTopicTrigger } from '../src/lib/triggers/webhook-topic-trigger';
 
@@ -10,6 +10,7 @@ vi.mock('../src/lib/common', async (importOriginal) => {
 });
 
 type EnableContext = Parameters<typeof oroWebhookTopicTrigger.onEnable>[0];
+type DisableContext = Parameters<typeof oroWebhookTopicTrigger.onDisable>[0];
 type RunContext = Parameters<typeof oroWebhookTopicTrigger.run>[0];
 
 const TOPIC = 'oro.customer.created';
@@ -48,10 +49,12 @@ function createRunContext({
   store,
   headers,
   rawBody,
+  signDeliveries = true,
 }: {
   store: ReturnType<typeof createStore>;
   headers?: Record<string, string>;
   rawBody?: unknown;
+  signDeliveries?: boolean;
 }): RunContext {
   return {
     store,
@@ -61,7 +64,7 @@ function createRunContext({
       headers,
       queryParams: {},
     },
-    propsValue: { topic: TOPIC, signDeliveries: true },
+    propsValue: { topic: TOPIC, signDeliveries },
     flows: { current: { id: 'flow-1', version: { id: 'flow-version-1' } } },
     step: { name: 'trigger' },
   } as unknown as RunContext;
@@ -245,17 +248,30 @@ describe('the webhook trigger verifies signed deliveries', () => {
     expect(result).toStrictEqual([]);
   });
 
-  it('keeps a flow enabled before signing existed running unverified', async () => {
+  it('discards a delivery when signing is on and the store holds no secret', async () => {
     const store = createStore({ webhookId: 'wh-legacy', topic: TOPIC });
 
     const result = await oroWebhookTopicTrigger.run(
       createRunContext({ store, headers: {}, rawBody: RAW_BODY })
     );
 
-    expect(result).toStrictEqual([BODY]);
+    expect(result).toStrictEqual([]);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('no signing secret is stored')
+    );
   });
 
-  it('does not start verifying just because a signature header showed up', async () => {
+  it('discards a delivery when signing is on and the store entry is missing entirely', async () => {
+    const store = createStore();
+
+    const result = await oroWebhookTopicTrigger.run(
+      createRunContext({ store, headers: {}, rawBody: RAW_BODY })
+    );
+
+    expect(result).toStrictEqual([]);
+  });
+
+  it('cannot be talked into accepting by presenting any signature it cannot check', async () => {
     const store = createStore({ webhookId: 'wh-legacy', topic: TOPIC });
 
     const result = await oroWebhookTopicTrigger.run(
@@ -264,6 +280,16 @@ describe('the webhook trigger verifies signed deliveries', () => {
         headers: { 'webhook-signature': 'f'.repeat(64) },
         rawBody: RAW_BODY,
       })
+    );
+
+    expect(result).toStrictEqual([]);
+  });
+
+  it('accepts unsigned deliveries only when the checkbox is explicitly off', async () => {
+    const store = createStore({ webhookId: 'wh-unsigned', topic: TOPIC });
+
+    const result = await oroWebhookTopicTrigger.run(
+      createRunContext({ store, headers: {}, rawBody: RAW_BODY, signDeliveries: false })
     );
 
     expect(result).toStrictEqual([BODY]);
@@ -344,6 +370,91 @@ describe('enabling the webhook trigger provisions the signing secret', () => {
       method: HttpMethod.POST,
       resourceUri: 'webhooks',
     });
+    expect(storedInfo(store)['webhookId']).toBe('wh-created');
+  });
+});
+
+describe('disabling the webhook trigger only forgets a registration that is really gone', () => {
+  function createDisableContext(store: ReturnType<typeof createStore>): DisableContext {
+    return {
+      store,
+      auth: {
+        type: 'CUSTOM_AUTH',
+        props: {
+          serverUrl: 'https://store.example.com',
+          adminPrefix: 'admin',
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+          isInternalInfrastructure: false,
+        },
+      },
+      propsValue: { topic: TOPIC, signDeliveries: true },
+    } as unknown as DisableContext;
+  }
+
+  function rejectWith(status: number): void {
+    vi.mocked(oroApiCall).mockReset();
+    vi.mocked(oroApiCall).mockRejectedValue(
+      new HttpError(undefined, { status, responseBody: { errors: [{ title: 'nope' }] } })
+    );
+  }
+
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('forgets the registration when Oro reports it as gone', async () => {
+    const store = createStore({ webhookId: 'wh-1', topic: TOPIC, secret: SECRET });
+    rejectWith(404);
+
+    await oroWebhookTopicTrigger.onDisable(createDisableContext(store));
+
+    expect(store.values.has('webhookInfo')).toBe(false);
+  });
+
+  it.each([401, 403])(
+    'fails and keeps the registration when the credentials cannot delete it (%i)',
+    async (status) => {
+      const store = createStore({ webhookId: 'wh-1', topic: TOPIC, secret: SECRET });
+      rejectWith(status);
+
+      await expect(
+        oroWebhookTopicTrigger.onDisable(createDisableContext(store))
+      ).rejects.toThrow(`OroCommerce API Error (${status})`);
+
+      expect(store.values.has('webhookInfo')).toBe(true);
+    }
+  );
+
+  it('fails and keeps the registration when Oro is unhealthy', async () => {
+    const store = createStore({ webhookId: 'wh-1', topic: TOPIC, secret: SECRET });
+    rejectWith(500);
+
+    await expect(
+      oroWebhookTopicTrigger.onDisable(createDisableContext(store))
+    ).rejects.toThrow('OroCommerce API Error (500)');
+
+    expect(store.values.has('webhookInfo')).toBe(true);
+  });
+
+  it('reports, rather than hides, a stale registration it cannot drop on enable', async () => {
+    const store = createStore({ webhookId: 'wh-stale', topic: TOPIC, secret: SECRET });
+    vi.mocked(oroApiCall).mockReset();
+    vi.mocked(oroApiCall)
+      .mockRejectedValueOnce(
+        new HttpError(undefined, { status: 403, responseBody: { errors: [{ title: 'denied' }] } })
+      )
+      .mockResolvedValue({ status: 201, headers: {}, body: { data: { id: 'wh-created' } } });
+
+    await oroWebhookTopicTrigger.onEnable(createEnableContext({ store, signDeliveries: true }));
+
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('OroCommerce webhook wh-stale could not be removed')
+    );
     expect(storedInfo(store)['webhookId']).toBe('wh-created');
   });
 });

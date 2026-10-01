@@ -132,7 +132,18 @@ export const oroWebhookTopicTrigger = createTrigger({
     const secret = webhookInfo?.secret;
 
     if (secret === undefined || secret === null) {
-      return [context.payload.body];
+      // No stored secret means nothing can be verified. Accepting the delivery anyway would let
+      // anyone who learns the webhook URL run the flow, so the checkbox decides: only a flow that
+      // explicitly turned signing off accepts unsigned deliveries.
+      if (context.propsValue.signDeliveries === false) {
+        return [context.payload.body];
+      }
+
+      console.warn(
+        `${describeDelivery(context)}: signing is on but no signing secret is stored, ` +
+          'so disable and re-enable the flow to register a new webhook and secret in OroCommerce.'
+      );
+      return [];
     }
 
     const rejection = findSignatureRejection({
@@ -142,9 +153,7 @@ export const oroWebhookTopicTrigger = createTrigger({
     });
 
     if (rejection !== undefined) {
-      console.warn(
-        `OroCommerce webhook delivery discarded (flow ${context.flows?.current?.id ?? 'unknown'}, step "${context.step?.name ?? 'unknown'}"): ${rejection}.`
-      );
+      console.warn(`${describeDelivery(context)}: ${rejection}.`);
       return [];
     }
 
@@ -167,9 +176,10 @@ async function deleteWebhook({
       throwOriginalError: true,
     });
   } catch (error: unknown) {
-    const alreadyGone =
-      error instanceof HttpError &&
-      [401, 403, 404].includes(error.response.status);
+    // Only a 404 proves the webhook is no longer there. A 401 or a 403 means the credentials were
+    // revoked or lost the permission, and the webhook is still live in Oro holding its secret, so
+    // treating those as "already gone" would drop the store entry and leave it delivering forever.
+    const alreadyGone = error instanceof HttpError && error.response.status === 404;
 
     if (!alreadyGone) {
       throw new Error(formatError({ error }));
@@ -186,9 +196,25 @@ async function discardWebhook({
 }): Promise<void> {
   try {
     await deleteWebhook({ auth, webhookId });
-  } catch {
-    return;
+  } catch (error: unknown) {
+    // Best effort by design: this runs while onEnable is already cleaning up or replacing a
+    // registration, and failing here would leave the caller worse off. It is still reported, so a
+    // registration left behind in Oro is visible in the logs instead of silently accumulating.
+    console.warn(
+      `OroCommerce webhook ${webhookId} could not be removed, so delete it under ` +
+        `System > Integrations > Webhooks: ${formatError({ error })}`
+    );
   }
+}
+
+function describeDelivery(context: {
+  flows?: { current?: { id?: string } };
+  step?: { name?: string };
+}): string {
+  return (
+    'OroCommerce webhook delivery discarded ' +
+    `(flow ${context.flows?.current?.id ?? 'unknown'}, step "${context.step?.name ?? 'unknown'}")`
+  );
 }
 
 function findSignatureRejection({
