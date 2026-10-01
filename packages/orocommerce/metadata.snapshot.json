@@ -39,7 +39,7 @@
       "headers": {
         "type": "LONG_TEXT",
         "displayName": "Default HTTP Headers",
-        "description": "JSON object of HTTP headers sent with every action. A header set on the step wins; Authorization is always managed by this connection.",
+        "description": "JSON object of headers sent with every action. Step headers win. Authorization is ignored.",
         "required": false,
         "defaultValue": null
       },
@@ -76,7 +76,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -182,7 +182,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -330,7 +330,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -527,7 +527,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -878,7 +878,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1104,7 +1104,7 @@
     },
     "serialize_jsonapi": {
       "displayName": "Serialize JSON:API Request",
-      "description": "Builds a JSON:API request body from a plain object, ready for the Request Body of the API Call action.",
+      "description": "Builds a JSON:API request body from a plain object. Add \"_meta\": {\"update\": true} to an embedded record to update it instead of creating a new one.",
       "requireAuth": true,
       "type": null,
       "props": {
@@ -1176,7 +1176,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1282,7 +1282,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1391,13 +1391,6 @@
           "required": false,
           "defaultValue": null
         },
-        "password": {
-          "type": "SHORT_TEXT",
-          "displayName": "Password",
-          "description": "New password for the account. Prefer a value from a secret store over a literal one.",
-          "required": false,
-          "defaultValue": null
-        },
         "userRoles": {
           "type": "MULTI_SELECT_DROPDOWN",
           "displayName": "Roles (replaces all existing roles)",
@@ -1430,7 +1423,7 @@
         "additionalHeaders": {
           "type": "OBJECT",
           "displayName": "Additional Headers",
-          "description": "Headers for this step; override the connection defaults. Example: {\"X-Include\": \"totalCount\"}",
+          "description": "Headers for this step; override the connection defaults. Authorization is ignored. Example: {\"X-Include\": \"totalCount\"}",
           "required": false,
           "defaultValue": null
         },
@@ -1536,13 +1529,6 @@
           "type": "DROPDOWN",
           "displayName": "Business Unit",
           "description": "Search business units.",
-          "required": false,
-          "defaultValue": null
-        },
-        "password": {
-          "type": "SHORT_TEXT",
-          "displayName": "Password",
-          "description": "New password for the account. Prefer a value from a secret store over a literal one.",
           "required": false,
           "defaultValue": null
         },

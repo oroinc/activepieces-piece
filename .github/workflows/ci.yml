@@ -15,6 +15,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor this repository builds on. 24 is what the Activepieces image runs, and the
+        # piece talks to Node's own fetch through a bundled undici, so the pairing has to be proven
+        # on the version that actually serves flows, not only on the oldest one that compiles.
+        node-version: ['20', '24']
     steps:
       - uses: actions/checkout@v4
 
@@ -22,8 +29,11 @@ jobs:
       # artifact and check the metadata snapshot. The release workflow runs the same action, so a
       # tag build is checked exactly the way a pull request is.
       - uses: ./.github/actions/build-piece
+        with:
+          node-version: ${{ matrix.node-version }}
 
       - name: Upload artifact
+        if: matrix.node-version == '20'
         uses: actions/upload-artifact@v4
         with:
           name: piece-tgz

@@ -28,11 +28,14 @@ export function serialize(options: SerializeOptions): SerializeResult {
       : undefined;
   const resolvedId = (id && id.trim() !== '' ? id.trim() : undefined) ?? idFromFlat;
 
+  const meta = readMeta({ resource: flat });
+
   const dataBlock: Record<string, unknown> = {
     type,
     ...(resolvedId ? { id: resolvedId } : {}),
     attributes,
     ...(Object.keys(mergedRels).length > 0 ? { relationships: mergedRels } : {}),
+    ...(meta ? { meta } : {}),
   };
 
   const result: SerializeResult = { data: dataBlock };
@@ -95,7 +98,26 @@ function isLinkageLike(value: unknown): value is MarkedResource | RawLinkage {
 }
 
 function isFullResource(resource: MarkedResource): boolean {
-  return Object.keys(resource).some((k) => k !== '_type' && k !== 'id');
+  // `_meta` on its own says what to do with a record but carries nothing to do it with, so it does
+  // not turn a linkage into an embedded resource.
+  return Object.keys(resource).some((k) => k !== '_type' && k !== 'id' && k !== META_KEY);
+}
+
+/**
+ * Read the `_meta` a caller put on a record.
+ *
+ * Oro decides from an included record's `meta` whether to create it or load an existing one: with
+ * no meta it is always created, `{ update: true }` requires it to exist, `{ upsert: true }` allows
+ * either. There was no way to say that through this action, so an embedded record could only ever
+ * be a new one.
+ */
+function readMeta({ resource }: { resource: FlatResource }): Record<string, unknown> | undefined {
+  const value = resource[META_KEY];
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const meta = value as Record<string, unknown>;
+  return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
 function toLinkage(resource: MarkedResource): Linkage {
@@ -132,6 +154,9 @@ function hoistResource({
     const { attributes, relationships } = splitEntries({ flat: resource, collected });
     if (Object.keys(attributes).length > 0) hoisted.attributes = attributes;
     if (Object.keys(relationships).length > 0) hoisted.relationships = relationships;
+
+    const meta = readMeta({ resource });
+    if (meta) hoisted.meta = meta;
   }
 
   return linkage;
@@ -172,7 +197,7 @@ function splitEntries({
   const relationships: Record<string, RelationshipBlock> = {};
 
   for (const [key, value] of Object.entries(flat)) {
-    if (key === '_type' || key === 'id') continue;
+    if (key === '_type' || key === 'id' || key === META_KEY) continue;
 
     if (isNullRelationship(value)) {
       relationships[key] = { data: null };
@@ -204,6 +229,9 @@ function splitFlat({ flat }: { flat: FlatResource }): {
   const { attributes, relationships } = splitEntries({ flat, collected });
   return { attributes, relationships, hoisted: Array.from(collected.values()) };
 }
+
+/** Instruction for Oro about the record it sits on, not a field of the record. */
+const META_KEY = '_meta';
 
 type MarkedResource = FlatResource & { _type: string };
 

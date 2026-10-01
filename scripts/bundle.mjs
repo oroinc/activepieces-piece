@@ -102,6 +102,8 @@ export function bundle() {
   rmSync(localDist, { recursive: true, force: true });
   cpSync(builtDist, localDist, { recursive: true });
 
+  forceTlsVerification(join(localDist, 'src', 'index.js'));
+
   console.log('Writing README, LICENSE and NOTICE into the package');
   // README, LICENSE and NOTICE ship; other docs stay out because only what is copied into dist is
   // packed.
@@ -142,6 +144,49 @@ export function bundle() {
   console.log(`\nPacked ${manifest.name}@${manifest.version}`);
   console.log(`  ${tarball}`);
   return tarball;
+}
+
+/**
+ * Take upstream's blanket certificate opt-out out of the artifact.
+ *
+ * FetchHttpClient.sendRequest opens by setting NODE_TLS_REJECT_UNAUTHORIZED to '0', which turns off
+ * certificate verification for every request it makes - and, because the variable is process-wide
+ * and pieces share a worker, for everything running next to it too. The piece bundles that client,
+ * so the assignment ends up in what we publish.
+ *
+ * It cannot be fixed in .ap-src: that tree has to stay byte-identical to the pinned commit, which
+ * ap:check-clean enforces. So it is cut out of the built bundle instead, here, where the edit is
+ * visible in the build rather than hidden in a checkout.
+ *
+ * The count has to be exactly one. Zero means upstream moved or reworded it and this no longer does
+ * anything - which would ship the opt-out again, silently, so the build stops instead. More than one
+ * means there is a second site to think about before removing anything.
+ */
+function forceTlsVerification(indexFile) {
+  const ASSIGNMENT =
+    /process\.env(?:\.NODE_TLS_REJECT_UNAUTHORIZED|\[(["'])NODE_TLS_REJECT_UNAUTHORIZED\1\])\s*=\s*(["'])0\2\s*;/g;
+  const source = readFileSync(indexFile, 'utf8');
+  const found = source.match(ASSIGNMENT) ?? [];
+
+  if (found.length !== 1) {
+    throw new Error(
+      `Expected exactly one NODE_TLS_REJECT_UNAUTHORIZED assignment in ${indexFile}, found ${found.length}. ` +
+        'Upstream changed how it disables certificate verification. Re-read ' +
+        'packages/pieces/common/src/lib/http/core/fetch-http-client.ts at the pinned commit and update ' +
+        'forceTlsVerification in scripts/bundle.mjs before releasing.',
+    );
+  }
+
+  const patched = source.replace(ASSIGNMENT, '');
+  if (patched.includes('NODE_TLS_REJECT_UNAUTHORIZED')) {
+    throw new Error(
+      `${indexFile} still mentions NODE_TLS_REJECT_UNAUTHORIZED after the assignment was removed. ` +
+        'Something else in the bundle touches it; check before releasing.',
+    );
+  }
+
+  writeFileSync(indexFile, patched);
+  console.log('Removed the bundled NODE_TLS_REJECT_UNAUTHORIZED opt-out (1 occurrence)');
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
