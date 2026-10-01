@@ -113,8 +113,10 @@ Content-Type: application/vnd.api+json   (built in)
   → the step's Additional Headers
 ```
 
-`Authorization` is passed separately as the request's `authentication` and cannot be overridden from
-any of those.
+`Authorization` is not one of them. The shared client applies the request's `authentication` first
+and then spreads the request headers over it, so a header named `Authorization` used to win the merge
+and replace the bearer token. `client.ts` drops it, case-insensitively, from the connection headers,
+from the step's headers and once more from the merged set.
 
 `Custom API Call` is built from the shared `createCustomApiCallAction` (`packages/pieces/common`
 in upstream Activepieces, at `.ap-pin`), which merges `{...stepHeaders, ...authMappingResult}` -
@@ -125,6 +127,41 @@ same precedence as above.
 `propsValue` is the second argument `createCustomApiCallAction` hands to `authMapping`; without
 using it the step's headers would silently lose to the connection's. `Authorization` is appended
 last and always wins.
+
+`api-call.ts` also replaces the action's `run` and `test` with a wrapper that answers a 401 by
+dropping the cached token and trying once more, which is what `oroApiCall` does for every other
+action. Everything else about the action - its name, its props, its metadata - is upstream's and is
+left alone, because those props are the piece's public surface and `metadata.snapshot.json` pins
+them.
+
+## Certificate verification
+
+Upstream's `FetchHttpClient.sendRequest` opens by setting `NODE_TLS_REJECT_UNAUTHORIZED` to `'0'`.
+The piece bundles that client, so without intervention every request it makes skips certificate
+checks - and, because the variable is process-wide and pieces share a worker, so does everything
+running beside it.
+
+Two things put it back, and both are needed:
+
+- `scripts/bundle.mjs` removes the assignment from the built bundle. It requires exactly one match
+  and fails the build otherwise, so an upstream rewording stops the release rather than quietly
+  restoring the opt-out. `.ap-src` is never patched; `ap:check-clean` would catch that.
+- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici `Agent` with
+  `rejectUnauthorized: true`. An explicit value on the socket is read instead of the environment
+  variable, which is the only way to hold when *another* piece has already set it to `'0'`.
+
+The wrapper is what reaches `Custom API Call`: `createCustomApiCallAction` builds its request
+internally and calls `sendRequest` with no options, so there is no argument to pass a dispatcher
+through.
+
+`undici` is pinned to `7.30.0` and bundled into the artifact, since the Activepieces image has no
+resolvable `undici` of its own. The version needs care, though not version matching: undici 6 and 7
+are both accepted by Node 20, 22 and 24, whichever of the two those Node versions bundle themselves.
+undici 8 is not. It reworked the handler interface, so a dispatcher built by it is refused with
+`UND_ERR_INVALID_ARG` by every Node released so far, and the piece would lose certificate
+verification on the first request a flow makes. `test/tls-verification.test.ts` sends a real request
+through the global `fetch` rather than comparing versions, and CI runs the suite on Node 20 and on
+Node 24, so a mismatch fails the build.
 
 ## Dropdowns and paging
 
@@ -218,44 +255,45 @@ with unusable input, and `test/i18n.test.ts` runs the i18n gate below.
 
 ## The i18n gate
 
-`src/i18n/translation.json` is the English source; the per-locale files beside it are its
-translations. Both are generated, not hand-maintained:
+The piece ships English only. `src/i18n/translation.json` is the English source Activepieces reads
+its strings from; there are no per-locale files, and `i18n:check` fails if one appears, because
+Activepieces would load it as a translation.
 
 ```bash
-npm run build && npm run i18n:write   # regenerates translation.json and the locale files
+npm run build && npm run i18n:write   # regenerates translation.json
 ```
 
 `i18n:write` is the only generator this repository has, and it needs the built piece, so run the
 build first. Activepieces' own CLI has a `pieces generate-translation-file` command, but it finds a
 piece by looking under `<cwd>/packages/pieces`, a layout that exists only inside the fetched upstream
 tree, so it cannot be pointed at `packages/orocommerce` from here. `i18n:write` walks the same
-metadata paths and truncates keys the same way, and it also reconciles the locale files, which the
-CLI does not.
+metadata paths and truncates keys the same way.
 
-`npm run i18n:check` (`tools/check-i18n.mjs`) fails when they drift, and `test/i18n.test.ts` runs it
-as part of the suite, so `npm test` covers it. It imports the **built** piece from `dist/` and only
-checks that the file exists, never that it is current, so run `npm run bundle` before it. It walks
-the same 19 metadata paths as `pieceTranslation.pathsToValuesToTranslate` in
-`packages/pieces/framework/src/lib/i18n.ts` in upstream Activepieces (at `.ap-pin`), and
-truncates keys at 512 characters exactly as the official generator does. It fails on keys missing
-from or stale in `translation.json`, on any locale file whose key set differs from it, and on empty
-values. Values identical to the English source are a warning; `--strict-untranslated` promotes them
-to errors.
+`npm run i18n:check` (`tools/check-i18n.mjs`) fails when the source drifts from the piece, and
+`test/i18n.test.ts` runs it as part of the suite, so `npm test` covers it. It imports the **built**
+piece from `dist/` and only checks that the file exists, never that it is current, so run
+`npm run bundle` before it. It walks the same 19 metadata paths as
+`pieceTranslation.pathsToValuesToTranslate` in `packages/pieces/framework/src/lib/i18n.ts` in
+upstream Activepieces (at `.ap-pin`), and truncates keys at 512 characters exactly as the official
+generator does. It fails on keys missing from or stale in `translation.json`, on empty values, and on
+any other file in `src/i18n`.
 
-`i18n:write` regenerates `translation.json` and reconciles every locale file against it - stale keys
-are dropped, missing keys are seeded with the English text, and existing translations are left
-untouched. Dropped keys are listed, because a key disappears whenever its English source text
-changes and the translation attached to it goes with it. Seeded keys still need translating.
+Translations were dropped before the first release. German, French and Dutch were about half English
+copy, and Polish and Ukrainian could not be loaded at all: `pieceTranslation.initializeI18n` iterates
+`LocalesEnum` (`packages/core/utils/src/lib/locale.ts` in upstream Activepieces, at `.ap-pin`), which
+has neither. Half-translated files that shipped as finished were worse than none. Adding locales back
+means adding the files and translating every key in them.
 
 ## Passwords are step inputs, and step inputs are not secrets
 
-Four actions take a password: `create-user`, `update-user`, `create-customer-user` and
-`update-customer-user`. Their values are ordinary step inputs - rendered in clear text in the
-builder, persisted in the flow version, and stored in step inputs. Run-log input truncation
+Two actions take a password: `create-user` and `create-customer-user`. Oro exposes the field on
+create only - a PATCH carrying it is refused as an extra field - so the update actions do not offer
+it. Their values are ordinary step inputs - rendered in clear text in the builder, persisted in the
+flow version, and stored in step inputs. Run-log input truncation
 (`AP_FLOW_RUN_LOG_INPUT_TRUNCATE_THRESHOLD_KB`, 2 KB) does not help; a password is far under the
 threshold. The prop descriptions point at a secret store, which is the only mitigation available
-today. `update-user` can change username, email, password and auth status in one call, so it can
-lock an existing user out of their account.
+today. `update-user` can still change username, email and auth status in one call, so it can lock an
+existing user out of their account.
 
 There is no `Property.SecretText` to switch to. `SecretTextProperty` exists, but only as a
 `PieceAuthProperty` reachable through `PieceAuth.SecretText`, and it is deliberately absent from the
@@ -296,14 +334,9 @@ client secret always come from the connection.
 - `Serialize JSON:API Request` accepts a single-resource document and unwraps it, but **rejects a
   collection** (`data` is an array) with an explanatory error. Loop first.
 - Props created inside `Property.DynamicProperties` never reach piece metadata, so the line-item
-  field labels in `create-order.ts` and `create-invoice.ts` cannot be translated at all. Moving those
-  props out of `DynamicProperties` into a plain `Property.Array` is the only fix, and it is a
-  separate decision.
-- `src/i18n/pl.json` and `src/i18n/uk.json` are never loaded. `pieceTranslation.initializeI18n`
-  iterates `LocalesEnum` (`packages/core/utils/src/lib/locale.ts` in upstream Activepieces, at
-  `.ap-pin`), which has no Polish or Ukrainian. The gate keeps them in sync so they are ready if
-  those locales are added, and
-  `i18n:check` prints a warning for each.
+  field labels in `create-order.ts` and `create-invoice.ts` are absent from `translation.json` and
+  could not be translated even if locales came back. Moving those props out of `DynamicProperties`
+  into a plain `Property.Array` is the only fix, and it is a separate decision.
 - **An untouched `Property.Checkbox` arrives as `false`, not `undefined`, so no update action may use
   one.** The builder seeds an unset checkbox with `property.defaultValue ?? false`
   (`packages/web/src/features/pieces/utils/form-utils.tsx` in upstream Activepieces, at `.ap-pin`)

@@ -6,18 +6,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_FILE = 'translation.json';
 const MAX_KEY_LENGTH_FOR_CORWDIN = 512;
-const RUNTIME_LOCALES = new Set([
-  'nl',
-  'en',
-  'de',
-  'fr',
-  'es',
-  'ja',
-  'zh',
-  'pt',
-  'ar',
-  'zh-TW',
-]);
 
 const PATHS_TO_VALUES_TO_TRANSLATE = [
   'description',
@@ -118,11 +106,13 @@ async function writeJson({ filePath, value }) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function listLocaleFiles({ i18nDir }) {
+/**
+ * The piece ships English only. Anything else beside the source file is a leftover: Activepieces
+ * would load it as a translation, so it is reported rather than ignored.
+ */
+async function listStrayFiles({ i18nDir }) {
   const entries = await readdir(i18nDir);
-  return entries
-    .filter((entry) => entry.endsWith('.json') && entry !== SOURCE_FILE)
-    .sort();
+  return entries.filter((entry) => entry !== SOURCE_FILE).sort();
 }
 
 function difference({ from, without }) {
@@ -142,7 +132,6 @@ async function run() {
     return hit ? hit.slice(name.length + 3) : fallback;
   };
   const write = args.includes('--write');
-  const strictUntranslated = args.includes('--strict-untranslated');
   const modulePath = resolve(
     option('bundle', join(PACKAGE_ROOT, 'dist', 'src', 'index.js'))
   );
@@ -153,7 +142,6 @@ async function run() {
   const expectedKeys = new Set(Object.keys(expected));
 
   const errors = [];
-  const warnings = [];
 
   const sourcePath = join(i18nDir, SOURCE_FILE);
   if (write) {
@@ -183,67 +171,12 @@ async function run() {
     }
   }
 
-  for (const file of await listLocaleFiles({ i18nDir })) {
-    const locale = file.replace(/\.json$/, '');
-    const localePath = join(i18nDir, file);
-    const existing = await readJson({ filePath: localePath });
-
-    if (!RUNTIME_LOCALES.has(locale)) {
-      warnings.push(
-        `src/i18n/${file} is never loaded: "${locale}" is not one of the locales Activepieces supports (${[...RUNTIME_LOCALES].join(', ')}).`
-      );
-    }
-
-    if (write) {
-      const reconciled = {};
-      for (const key of expectedKeys) {
-        reconciled[key] = existing[key] ?? expected[key];
-      }
-      await writeJson({ filePath: localePath, value: reconciled });
-      const added = difference({ from: expectedKeys, without: new Set(Object.keys(existing)) });
-      const removed = difference({ from: new Set(Object.keys(existing)), without: expectedKeys });
-      console.log(`reconciled src/i18n/${file}: +${added.length} seeded, -${removed.length} stale`);
-      if (removed.length > 0) {
-        console.log(`  ${reportList({ label: 'Dropped, translation lost', keys: removed })}`);
-      }
-      continue;
-    }
-
-    const localeKeys = new Set(Object.keys(existing));
-    const missing = difference({ from: expectedKeys, without: localeKeys });
-    const stale = difference({ from: localeKeys, without: expectedKeys });
-
-    if (missing.length > 0) {
-      errors.push(
-        `src/i18n/${file} is missing keys present in ${SOURCE_FILE}. ${reportList({ label: 'Missing', keys: missing })}`
-      );
-    }
-    if (stale.length > 0) {
-      errors.push(
-        `src/i18n/${file} has keys absent from ${SOURCE_FILE}. ${reportList({ label: 'Stale', keys: stale })}`
-      );
-    }
-
-    const untranslated = [];
-    for (const [key, value] of Object.entries(existing)) {
-      if (typeof value !== 'string' || value.trim().length === 0) {
-        errors.push(`src/i18n/${file} has an empty value for "${key}".`);
-      } else if (expectedKeys.has(key) && value === expected[key]) {
-        untranslated.push(key);
-      }
-    }
-    if (untranslated.length > 0) {
-      const message = `src/i18n/${file} repeats the English source verbatim. ${reportList({ label: 'Untranslated', keys: untranslated })}`;
-      if (strictUntranslated) {
-        errors.push(message);
-      } else {
-        warnings.push(message);
-      }
-    }
-  }
-
-  for (const warning of warnings) {
-    console.warn(`warning: ${warning}`);
+  const stray = await listStrayFiles({ i18nDir });
+  if (stray.length > 0) {
+    errors.push(
+      `src/i18n holds files besides ${SOURCE_FILE}, but the piece ships English only. ` +
+        `${reportList({ label: 'Unexpected', keys: stray })}`
+    );
   }
 
   if (errors.length > 0) {
@@ -251,13 +184,13 @@ async function run() {
       console.error(`error: ${error}`);
     }
     console.error(
-      `\ni18n check failed with ${errors.length} error(s). Regenerate with "npm run cli pieces generate-translation-file orocommerce" or "npm run i18n:write", then translate the seeded keys.`
+      `\ni18n check failed with ${errors.length} error(s). Regenerate with "npm run i18n:write".`
     );
     process.exit(1);
   }
 
   console.log(
-    `i18n check passed: ${expectedKeys.size} keys across ${SOURCE_FILE} and ${(await listLocaleFiles({ i18nDir })).length} locale file(s).`
+    `i18n check passed: ${expectedKeys.size} keys in ${SOURCE_FILE}, English only.`
   );
 }
 
