@@ -494,6 +494,7 @@ async function main() {
   }
 
   const stopWatcher = startWatcher(copyDir);
+  console.log(`env: ${relative(REPO_ROOT, join(checkoutDir, '.env.dev'))}`);
   console.log('\nStarting Activepieces. Sign in at http://localhost:4200 as dev@ap.com / 12345678.\n');
   start(checkoutDir, stopWatcher);
 }

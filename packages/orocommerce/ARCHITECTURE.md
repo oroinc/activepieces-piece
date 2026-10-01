@@ -244,7 +244,7 @@ A rejected delivery returns `[]` with a `console.warn`: no run is created and Or
 ## Local development
 
 The toolchain lives at the repository root, and so do the commands: see
-[Building and testing](../../README.md#building-and-testing) in the root README, which also explains
+[Local development](../../MAINTAINERS.md#local-development) in MAINTAINERS.md, which also explains
 the fetch, the pin and how to bump it. `.github/workflows/ci.yml` runs exactly that sequence on every
 pull request and on every push to `main`.
 

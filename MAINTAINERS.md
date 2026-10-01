@@ -50,9 +50,10 @@ Then edit `packages/orocommerce/src` as usual. Every save is mirrored into the c
 there, so a changed label or a changed return value shows up in about 10 seconds with no restart.
 The copy is one-way: only this repository is ever committed to.
 
-- `npm run dev:ap -- --fork` uses the fork's image branch in `.ap-dev-fork/` instead. For embed
-  testing only - that branch is not the pin.
-- `npm run dev:ap -- --reset` deletes `.ap-dev/` and `.ap-dev-fork/`, after you type `yes`.
+Other environment variables go in `.ap-dev/.env.dev`, not in shell exports: turbo strips every
+`AP_*` variable its `globalPassThroughEnv` does not list, and that is most of them. Restart after
+editing. The script sets only `AP_DEV_PIECES` and `AP_REUSE_SANDBOX` there and keeps every other
+line; `npm run dev:ap -- --reset` deletes the file along with `.ap-dev/`, after you type `yes`.
 
 ## Upgrading Activepieces
 
@@ -87,10 +88,5 @@ A version on npm is never rebuilt or republished; fix it with the next version.
 
 ## npm publishing
 
-- 1.0.0 is published once by hand by a maintainer of the `@oroinc` npm scope, from the release
-  `.tgz` after checking its sha256.
-- After that, trusted publishing is set up on the package (GitHub Actions,
-  `oroinc/activepieces-piece`, `release.yml`), and CI publishes later versions. No npm token is
-  stored in this repository.
-- Before enabling `NPM_PUBLISH_ENABLED`: `release.yml` needs npm 11.5.1+ (it uses Node 20 / npm 10
-  today).
+- Trusted publishing is set up on the package (GitHub Actions, `oroinc/activepieces-piece`,
+  `release.yml`), and CI publishes through it. No npm token is stored in this repository.
