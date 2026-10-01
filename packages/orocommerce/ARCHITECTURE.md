@@ -244,9 +244,10 @@ A rejected delivery returns `[]` with a `console.warn`: no run is created and Or
 ## Local development
 
 The toolchain lives at the repository root, and so do the commands: see
-[Local development](../../MAINTAINERS.md#local-development) in MAINTAINERS.md, which also explains
-the fetch, the pin and how to bump it. `.github/workflows/ci.yml` runs exactly that sequence on every
-pull request and on every push to `main`.
+[Build and test](../../MAINTAINERS.md#build-and-test) in MAINTAINERS.md. `.github/workflows/ci.yml`
+runs exactly that sequence on every pull request and on every push to `main`. The root README
+explains [the fetch](../../README.md#why-the-build-fetches-activepieces) and
+[the pin and how to bump it](../../README.md#the-pin).
 
 `test/jsonapi-roundtrip.test.ts` guards the serialize/deserialize contract above,
 `test/line-items.test.ts` guards line-item validation, `test/body-utils.test.ts` guards the
