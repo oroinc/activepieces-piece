@@ -108,10 +108,15 @@ Every action except `Custom API Call` goes through `oroApiCall`, where later win
 
 ```
 Content-Type: application/vnd.api+json   (built in)
+  → User-Agent: oroinc-piece-orocommerce/<version>   (built in)
   → connection "Default HTTP Headers"
   → internal-infrastructure User-Agent
   → the step's Additional Headers
 ```
+
+`mergeHeaders` matches names whatever their case, so a later set wins even when it spells a name
+differently. The token request gets the User-Agent those sets end with, and none of their other
+headers.
 
 `Authorization` is not one of them. The shared client applies the request's `authentication` first
 and then spreads the request headers over it, so a header named `Authorization` used to win the merge
@@ -123,7 +128,8 @@ in upstream Activepieces, at `.ap-pin`), which merges `{...stepHeaders, ...authM
 the step's own headers land *first*, so whatever `authMapping` returns would normally beat them.
 That is why `authMapping` in `src/lib/actions/api-call.ts` re-applies
 `toHeaderRecord({ value: propsValue['headers'] })` after the connection headers: it restores the
-same precedence as above.
+same precedence as above. `mergeHeaders` keeps the step's spelling of each name it sets, so
+upstream's first spread and this one land on the same key.
 `propsValue` is the second argument `createCustomApiCallAction` hands to `authMapping`; without
 using it the step's headers would silently lose to the connection's. `Authorization` is appended
 last and always wins.
@@ -146,13 +152,19 @@ Two things put it back, and both are needed:
 - `scripts/bundle.mjs` removes the assignment from the built bundle. It requires exactly one match
   and fails the build otherwise, so an upstream rewording stops the release rather than quietly
   restoring the opt-out. `.ap-src` is never patched; `ap:check-clean` would catch that.
-- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici `Agent` with
+- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici dispatcher with
   `rejectUnauthorized: true`. An explicit value on the socket is read instead of the environment
   variable, which is the only way to hold when *another* piece has already set it to `'0'`.
 
 The wrapper is what reaches `Custom API Call`: `createCustomApiCallAction` builds its request
 internally and calls `sendRequest` with no options, so there is no argument to pass a dispatcher
 through.
+
+The dispatcher is an `EnvHttpProxyAgent`, so `http_proxy`, `https_proxy` and `no_proxy` (lower case
+first) apply. It reads the proxy URLs when `tls.ts` loads. Through a CONNECT proxy undici ignores
+`connect` and starts TLS with the server from `requestTls`, so the TLS options are given in both;
+without `requestTls` a proxied request would follow `NODE_TLS_REJECT_UNAUTHORIZED` again.
+`test/proxy.test.ts` runs the artifact behind a local proxy.
 
 `undici` is pinned to `7.30.0` and bundled into the artifact, since the Activepieces image has no
 resolvable `undici` of its own. The version needs care, though not version matching: undici 6 and 7
@@ -321,8 +333,8 @@ The connection has an `isInternalInfrastructure` checkbox. When it is on, and on
 - `ORO_SERVER_URL` - replaces the connection's Server URL. It applies to **both** the token endpoint
   and the API base URL, and it is what the token cache key hashes, so flipping it does not reuse a
   token minted for the old host.
-- `ORO_SERVER_USER_AGENT` - adds a `User-Agent` header to the token request and to every API
-  request.
+- `ORO_SERVER_USER_AGENT` - replaces the `User-Agent` of the token request and of every API
+  request, the default and the connection's alike.
 
 Both are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client id and
 client secret always come from the connection.

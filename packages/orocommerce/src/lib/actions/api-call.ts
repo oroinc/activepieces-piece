@@ -3,13 +3,14 @@ import { tryCatch } from '@activepieces/pieces-framework';
 import {
   formatError,
   getAccessToken,
-  getConnectionHeaders,
-  getInternalInfrastructureHeaders,
+  getBaseHeaders,
   getOroAdminApiBaseUrl,
   invalidateAccessToken,
+  mergeHeaders,
   oroAuth,
   toHeaderRecord,
 } from '../common';
+import { withConnection } from '../common/tls';
 import type { OroAuth } from '../common/types';
 
 const upstreamAction = createCustomApiCallAction({
@@ -18,10 +19,10 @@ const upstreamAction = createCustomApiCallAction({
   displayName: 'Custom API Call',
   description: 'Make a direct authenticated call to the OroCommerce JSON:API.',
   baseUrl: (auth) => (auth ? getOroAdminApiBaseUrl({ auth }) : ''),
+  // Upstream spreads the step's headers first and these over them, so each name here keeps the
+  // spelling the step gave it, or a step header in another case than the connection's would lose.
   authMapping: async (auth, propsValue: Record<string, unknown>) => ({
-    ...getConnectionHeaders({ auth }),
-    ...getInternalInfrastructureHeaders({ auth }),
-    ...toHeaderRecord({ value: propsValue['headers'] }),
+    ...mergeHeaders(getBaseHeaders({ auth }), toHeaderRecord({ value: propsValue['headers'] })),
     Authorization: `Bearer ${await getAccessToken({ auth })}`,
   }),
   props: {
@@ -56,8 +57,11 @@ async function runWithStaleTokenRetry(context: RunContext): Promise<unknown> {
   // Read from the cache, so the retry can tell the token that just failed from one a parallel step
   // has already replaced. No request is made unless the cache is empty.
   const usedToken = await getAccessToken({ auth });
+  // Upstream's run sends its request with no options, so the connection's TLS setting reaches the
+  // shared client through this scope rather than as an argument.
+  const run = () => withConnection({ auth }, () => upstreamRun(context));
 
-  const first = await tryCatch(() => upstreamRun(context));
+  const first = await tryCatch(run);
 
   if (!first.error) {
     // With "Return Error as Output" on, a 401 comes back as output instead of being thrown.
@@ -65,7 +69,7 @@ async function runWithStaleTokenRetry(context: RunContext): Promise<unknown> {
       return first.data;
     }
     invalidateAccessToken({ auth, token: usedToken });
-    return await upstreamRun(context);
+    return await run();
   }
 
   if (!(first.error instanceof HttpError) || first.error.response.status !== 401) {
@@ -74,7 +78,7 @@ async function runWithStaleTokenRetry(context: RunContext): Promise<unknown> {
 
   invalidateAccessToken({ auth, token: usedToken });
 
-  const retry = await tryCatch(() => upstreamRun(context));
+  const retry = await tryCatch(run);
   if (retry.error) {
     throw new Error(formatError({ error: retry.error }));
   }

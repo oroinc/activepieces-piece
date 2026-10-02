@@ -1,7 +1,11 @@
-import { Agent } from 'undici';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+import { EnvHttpProxyAgent, type Dispatcher } from 'undici';
 
 import { httpClient } from '@activepieces/pieces-common';
 import type { SendRequestOptions } from '@activepieces/pieces-common';
+
+import type { OroAuth } from './types';
 
 /**
  * Keep certificate verification on for every request this piece makes.
@@ -31,13 +35,63 @@ import type { SendRequestOptions } from '@activepieces/pieces-common';
  * dispatcher through - and reimplementing that action to get one would change the props that make up
  * its public surface. Wrapping the client the action already calls leaves the action untouched and
  * covers every other caller in one place.
+ *
+ * Both agents also honour the proxy environment variables: http_proxy, https_proxy and no_proxy,
+ * each read in lower case first and then in upper case. undici reads the proxy URLs once, when the
+ * agent is built, and that is when this module loads, so the variables have to be in the engine's
+ * environment when it starts. Activepieces passes a variable from the worker to the engine only if
+ * AP_SANDBOX_PROPAGATED_ENV_VARS lists it. With none of them set, the agent connects directly, as a
+ * plain Agent would.
+ *
+ * The TLS options go in twice. `connect` is used when the agent connects to the server directly.
+ * Through a CONNECT proxy, undici replaces `connect` with its own tunnel and starts TLS with the
+ * server from `requestTls` instead, so without it a proxied request would ignore the connection's
+ * choice and fall back to whatever NODE_TLS_REJECT_UNAUTHORIZED says. The proxy's own TLS
+ * (`proxyTls`) is left at its defaults, so an https proxy with a private CA is not covered.
  */
-const verifyingAgent = new Agent({ connect: { rejectUnauthorized: true } });
+function agentFor(tls: { rejectUnauthorized: boolean }): Dispatcher {
+  return new EnvHttpProxyAgent({ connect: tls, requestTls: tls });
+}
+
+const verifyingAgent = agentFor({ rejectUnauthorized: true });
+
+/**
+ * For a connection whose "Verify TLS certificate" is off: a private or self-signed server the user
+ * trusts. It is handed to that connection's requests one by one, like the verifying agent, so nothing
+ * else changes: no environment variable, no global dispatcher, and every other connection and piece
+ * in the worker keeps verifying.
+ */
+const nonVerifyingAgent = agentFor({ rejectUnauthorized: false });
+
+/**
+ * The one place that decides how a request reaches the connection's server, directly or through
+ * the proxy, so every request path picks up the same choice at once.
+ *
+ * Only an explicit false turns verification off. A connection saved before the option existed has no
+ * value for it at all, and it keeps verifying, as does a request made with no connection.
+ */
+export function dispatcherForConnection({ auth }: { auth: OroAuth | undefined }): Dispatcher {
+  return auth?.props.verifyTlsCertificate === false ? nonVerifyingAgent : verifyingAgent;
+}
+
+/**
+ * The connection of a call into upstream code that sends its request with no options, which is how
+ * the Custom API Call reaches the client: there is no argument to carry the connection, so it travels
+ * with the async context instead. The store is this module's own and only the patch below reads it.
+ */
+const connectionScope = new AsyncLocalStorage<OroAuth>();
+
+export function withConnection<T>({ auth }: { auth: OroAuth }, fn: () => T): T {
+  return connectionScope.run(auth, fn);
+}
 
 export function requestOptionsWithTlsVerification(
   options?: SendRequestOptions
 ): SendRequestOptions {
-  return { ...options, dispatcher: options?.dispatcher ?? verifyingAgent };
+  return {
+    ...options,
+    dispatcher: options?.dispatcher ?? dispatcherForConnection({ auth: connectionScope.getStore() }),
+  };
 }
 
 let patched = false;
