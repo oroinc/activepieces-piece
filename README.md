@@ -90,7 +90,7 @@ after every bundle. If a script here ever writes into the tree, fix the script r
 `.ap-pin` holds one full 40-character upstream commit sha:
 
 ```
-ac16617326f0d25e0eb6a9bc50eb20271b9b1dcc
+23e0c254979c73cfbfbde00242668ee873e79508
 ```
 
 It must be a sha. Not a tag, not a version string, and never `git describe`. Upstream's root
@@ -98,7 +98,7 @@ It must be a sha. Not a tag, not a version string, and never `git describe`. Ups
 different trees, and a fork carries no upstream release tags for `git describe` to find. Two trees
 that both call themselves 0.88.1 shipped different versions of `core-utils` and `core-piece-types`.
 
-The pin above is the commit upstream tagged `0.92.0`.
+The pin above is the commit upstream tagged `0.92.1`.
 
 #### Bumping it
 
