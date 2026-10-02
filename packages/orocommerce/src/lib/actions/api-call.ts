@@ -3,10 +3,10 @@ import { tryCatch } from '@activepieces/pieces-framework';
 import {
   formatError,
   getAccessToken,
-  getConnectionHeaders,
-  getInternalInfrastructureHeaders,
+  getBaseHeaders,
   getOroAdminApiBaseUrl,
   invalidateAccessToken,
+  mergeHeaders,
   oroAuth,
   toHeaderRecord,
 } from '../common';
@@ -19,10 +19,10 @@ const upstreamAction = createCustomApiCallAction({
   displayName: 'Custom API Call',
   description: 'Make a direct authenticated call to the OroCommerce JSON:API.',
   baseUrl: (auth) => (auth ? getOroAdminApiBaseUrl({ auth }) : ''),
+  // Upstream spreads the step's headers first and these over them, so each name here keeps the
+  // spelling the step gave it, or a step header in another case than the connection's would lose.
   authMapping: async (auth, propsValue: Record<string, unknown>) => ({
-    ...getConnectionHeaders({ auth }),
-    ...getInternalInfrastructureHeaders({ auth }),
-    ...toHeaderRecord({ value: propsValue['headers'] }),
+    ...mergeHeaders(getBaseHeaders({ auth }), toHeaderRecord({ value: propsValue['headers'] })),
     Authorization: `Bearer ${await getAccessToken({ auth })}`,
   }),
   props: {

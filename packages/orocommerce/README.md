@@ -51,6 +51,15 @@ environment, so the first setting alone does not reach the piece. Restart after 
 Turning **Verify TLS certificate** off is the alternative for a trusted internal URL; it affects
 that connection only.
 
+### User-Agent
+
+Every request, the token request included, sends `User-Agent: oroinc-piece-orocommerce/<version>`,
+for example `oroinc-piece-orocommerce/1.0.0`. To send another, put `{"User-Agent": "..."}` in
+**Default HTTP Headers**, or turn **Internal infrastructure** on and set `ORO_SERVER_USER_AGENT` on
+the worker container with `AP_SANDBOX_PROPAGATED_ENV_VARS=ORO_SERVER_USER_AGENT` on the app
+container; that one wins over the connection's. A User-Agent set on a step wins on that step's
+request.
+
 ## Actions
 
 | Action | What it does |

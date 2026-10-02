@@ -108,10 +108,15 @@ Every action except `Custom API Call` goes through `oroApiCall`, where later win
 
 ```
 Content-Type: application/vnd.api+json   (built in)
+  → User-Agent: oroinc-piece-orocommerce/<version>   (built in)
   → connection "Default HTTP Headers"
   → internal-infrastructure User-Agent
   → the step's Additional Headers
 ```
+
+`mergeHeaders` matches names whatever their case, so a later set wins even when it spells a name
+differently. The token request gets the User-Agent those sets end with, and none of their other
+headers.
 
 `Authorization` is not one of them. The shared client applies the request's `authentication` first
 and then spreads the request headers over it, so a header named `Authorization` used to win the merge
@@ -123,7 +128,8 @@ in upstream Activepieces, at `.ap-pin`), which merges `{...stepHeaders, ...authM
 the step's own headers land *first*, so whatever `authMapping` returns would normally beat them.
 That is why `authMapping` in `src/lib/actions/api-call.ts` re-applies
 `toHeaderRecord({ value: propsValue['headers'] })` after the connection headers: it restores the
-same precedence as above.
+same precedence as above. `mergeHeaders` keeps the step's spelling of each name it sets, so
+upstream's first spread and this one land on the same key.
 `propsValue` is the second argument `createCustomApiCallAction` hands to `authMapping`; without
 using it the step's headers would silently lose to the connection's. `Authorization` is appended
 last and always wins.
@@ -327,8 +333,8 @@ The connection has an `isInternalInfrastructure` checkbox. When it is on, and on
 - `ORO_SERVER_URL` - replaces the connection's Server URL. It applies to **both** the token endpoint
   and the API base URL, and it is what the token cache key hashes, so flipping it does not reuse a
   token minted for the old host.
-- `ORO_SERVER_USER_AGENT` - adds a `User-Agent` header to the token request and to every API
-  request.
+- `ORO_SERVER_USER_AGENT` - replaces the `User-Agent` of the token request and of every API
+  request, the default and the connection's alike.
 
 Both are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client id and
 client secret always come from the connection.
