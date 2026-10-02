@@ -1,6 +1,6 @@
 node_modules/
 .ap-src/
-.ap-dev/
+.ap-dev*/
 .env.dev.local
 artifacts/
 packages/orocommerce/dist/
