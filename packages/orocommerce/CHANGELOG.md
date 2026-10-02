@@ -12,6 +12,9 @@ Semantic versioning: https://semver.org/
   are discarded.
 * TLS certificates are verified unless the connection's Verify TLS certificate (on by default) is
   turned off.
+* Requests go through the proxy set in `https_proxy`, `http_proxy` and `no_proxy` (or the upper-case
+  names), which reach the piece only when `AP_SANDBOX_PROPAGATED_ENV_VARS` lists them. Verify TLS
+  certificate applies through the proxy too.
 * The connection sets the Authorization header; one in Default HTTP Headers or on a step is ignored.
 * Custom API Call gets a new token and retries once after a 401.
 * Default HTTP Headers that are not valid JSON fail the step instead of being ignored.

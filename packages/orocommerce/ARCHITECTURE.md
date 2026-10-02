@@ -146,13 +146,19 @@ Two things put it back, and both are needed:
 - `scripts/bundle.mjs` removes the assignment from the built bundle. It requires exactly one match
   and fails the build otherwise, so an upstream rewording stops the release rather than quietly
   restoring the opt-out. `.ap-src` is never patched; `ap:check-clean` would catch that.
-- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici `Agent` with
+- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici dispatcher with
   `rejectUnauthorized: true`. An explicit value on the socket is read instead of the environment
   variable, which is the only way to hold when *another* piece has already set it to `'0'`.
 
 The wrapper is what reaches `Custom API Call`: `createCustomApiCallAction` builds its request
 internally and calls `sendRequest` with no options, so there is no argument to pass a dispatcher
 through.
+
+The dispatcher is an `EnvHttpProxyAgent`, so `http_proxy`, `https_proxy` and `no_proxy` (lower case
+first) apply. It reads the proxy URLs when `tls.ts` loads. Through a CONNECT proxy undici ignores
+`connect` and starts TLS with the server from `requestTls`, so the TLS options are given in both;
+without `requestTls` a proxied request would follow `NODE_TLS_REJECT_UNAUTHORIZED` again.
+`test/proxy.test.ts` runs the artifact behind a local proxy.
 
 `undici` is pinned to `7.30.0` and bundled into the artifact, since the Activepieces image has no
 resolvable `undici` of its own. The version needs care, though not version matching: undici 6 and 7
