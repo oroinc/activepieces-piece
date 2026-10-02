@@ -282,6 +282,8 @@ async function requestAccessToken({
       client_id: auth.props.clientId,
       client_secret: auth.props.clientSecret,
     }).toString(),
+  }).catch((error: unknown) => {
+    throw withoutRequestBody({ error });
   });
 
   const token = response.body.access_token;
@@ -291,6 +293,25 @@ async function requestAccessToken({
   });
 
   return token;
+}
+
+/**
+ * The token request's error, without the request body.
+ *
+ * Upstream's HttpError keeps the request body and writes it into its message, and the body of the
+ * token request is the client id and secret, so whatever catches the error - a step, a dropdown, a
+ * log line - would hold the secret in plain text. Rebuilt with the same status and response body, it
+ * is still an HttpError: every check for a 401 reads it as before, and formatError prints the same
+ * text.
+ */
+function withoutRequestBody({ error }: { error: unknown }): unknown {
+  if (!(error instanceof HttpError)) {
+    return error;
+  }
+  return new HttpError(undefined, {
+    status: error.response.status,
+    responseBody: error.response.body,
+  });
 }
 
 export function invalidateAccessToken({ auth, token }: { auth: OroAuth; token: string }): void {
