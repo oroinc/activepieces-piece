@@ -39,6 +39,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_FOLDER,
+  FULL_SHA,
   GENERATED_HEADER,
   buildEnvDev,
   changedEnvKeys,
@@ -132,11 +133,14 @@ function capture(command, cmdArgs, options = {}) {
   return result.stdout.trim();
 }
 
+/** The pinned upstream commit, or an error: main decides what a bad pin means for --reset. */
 function readPin() {
-  if (!existsSync(PIN_FILE)) die('.ap-pin is missing.');
+  if (!existsSync(PIN_FILE)) throw new Error('.ap-pin is missing.');
   const pin = readFileSync(PIN_FILE, 'utf8').trim();
-  if (!/^[0-9a-f]{40}$/.test(pin)) {
-    die(`.ap-pin must hold one full 40-character lowercase commit sha, got: ${JSON.stringify(pin)}.`);
+  if (!FULL_SHA.test(pin)) {
+    throw new Error(
+      `.ap-pin must hold one full 40-character lowercase commit sha, got: ${JSON.stringify(pin)}.`
+    );
   }
   return pin;
 }
@@ -374,6 +378,11 @@ function readLocalEnv() {
   return existsSync(LOCAL_ENV_FILE) ? parseLocalEnv(readFileSync(LOCAL_ENV_FILE, 'utf8')) : [];
 }
 
+/** Whether the checkout's HEAD has a .env.dev at its root: the file every dev run is built from. */
+function hasCommittedEnvDev(devDir) {
+  return spawnSync('git', ['-C', devDir, 'cat-file', '-e', 'HEAD:.env.dev']).status === 0;
+}
+
 /** Rebuilt from the committed file on every run, so nothing a previous run wrote is carried over. */
 function writeEnvDev(devDir, local) {
   const committed = spawnSync('git', ['-C', devDir, 'show', 'HEAD:.env.dev'], { encoding: 'utf8' });
@@ -385,7 +394,7 @@ function writeEnvDev(devDir, local) {
   }
   const { text, applied, ignored } = buildEnvDev(committed.stdout, local, ENV_SETTINGS);
   for (const key of ignored) console.warn(`.env.dev.local: ${key} is ignored, this script always sets it.`);
-  warnAboutHandEdits(devDir, committed.stdout);
+  warnAboutHandEdits(devDir, committed.stdout, local);
   writeFileSync(join(devDir, '.env.dev'), text);
   console.log(
     `.env.dev: rebuilt from the committed one, with ${ENV_SETTINGS.map(([k, v]) => `${k}=${v}`).join(', ')}.`
@@ -399,15 +408,17 @@ function writeEnvDev(devDir, local) {
 /**
  * A .env.dev without the generated header was written by an earlier version of this script, or by
  * hand. Once, before it is replaced, name the keys that are about to go, so that the developer can
- * move them to .env.dev.local. Names only: the values may be secrets. The script's own two keys
- * are left out, since every run sets them anyway.
+ * move them to .env.dev.local. Names only: the values may be secrets. Left out: the script's own
+ * two keys, since every run sets them anyway, and the keys .env.dev.local sets, since the rebuild
+ * writes those back a moment later.
  */
-function warnAboutHandEdits(devDir, committed) {
+function warnAboutHandEdits(devDir, committed, local) {
   const path = join(devDir, '.env.dev');
   if (!existsSync(path)) return;
   const existing = readFileSync(path, 'utf8');
   if (existing.startsWith(GENERATED_HEADER)) return;
-  const keys = changedEnvKeys(existing, committed, ENV_SETTINGS.map(([key]) => key));
+  const kept = [...ENV_SETTINGS.map(([key]) => key), ...local.map(([key]) => key)];
+  const keys = changedEnvKeys(existing, committed, kept);
   if (keys.length === 0) return;
   console.warn(
     `Warning: ${relative(REPO_ROOT, path)} was edited by hand and is rebuilt now. These keys differ ` +
@@ -679,7 +690,18 @@ function prepareSource(source, devDir) {
         '40-character sha.'
     );
   }
-  const commit = capture('git', ['-C', devDir, 'rev-parse', 'HEAD']);
+  // Before the marker, so that a ref this cannot use is never recorded as fetched. The folder is
+  // a moment old and holds nothing of the developer's, so it goes, and the next run with another
+  // ref makes a folder of its own.
+  if (!hasCommittedEnvDev(devDir)) {
+    rmSync(devDir, { recursive: true, force: true });
+    die(
+      `${describeSource(repo, ref)} has no .env.dev at its root, so there is nothing to build the ` +
+        `dev settings from, and ${folder} has been deleted again. Is this the right ref? Set ` +
+        'DEV_AP_REF in .env.dev.local to a commit, tag or branch of Activepieces that has one.'
+    );
+  }
+  const commit = readHead(devDir, folder);
   writeJson(join(devDir, MARKER_FILE), { repo, ref, commit });
   console.log(
     `${folder}: fetched ${ref}${ref === commit ? '' : ` at ${commit}`}. The install below adds ` +
@@ -728,14 +750,21 @@ async function main() {
     );
   }
 
-  const pin = readPin();
+  // --reset is how a developer recovers, so neither an .ap-pin nor a .env.dev.local the script
+  // cannot read may stop it. Without a pin, DEV_AP_REF can only name a source of its own.
+  let pin = null;
+  try {
+    pin = readPin();
+  } catch (error) {
+    if (!doReset) throw error;
+    console.warn(`Warning: ${error.message}\n--reset goes on without it.`);
+  }
   let local = [];
   let source;
   try {
     local = readLocalEnv();
-    source = resolveSource(local, UPSTREAM, pin);
+    source = resolveSource(local, UPSTREAM, pin, REPO_ROOT);
   } catch (error) {
-    // --reset is how a developer recovers, so a .env.dev.local it cannot read must not stop it.
     // Without a source there is no folder to pick, so it offers the default one.
     if (!doReset) throw error;
     console.warn(`Warning: ${error.message}\n--reset goes on with ${DEFAULT_FOLDER}/ regardless.`);

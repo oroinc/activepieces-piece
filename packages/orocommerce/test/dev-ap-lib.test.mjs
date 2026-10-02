@@ -4,6 +4,7 @@ import {
   GENERATED_HEADER,
   buildEnvDev,
   changedEnvKeys,
+  isLocalRepoPath,
   parseLocalEnv,
   refProblem,
   resolveSource,
@@ -98,7 +99,7 @@ describe('buildEnvDev', () => {
     expect(text).toContain(`\nNEW_SECRET=${value}\n`);
   });
 
-  it('collapses every committed line for an overridden key into one', () => {
+  it('rewrites every committed line for an overridden key, so the last one dotenv reads is the override', () => {
     const { text } = buildEnvDev('A=1\nB=2\nA=3\n', parseLocalEnv('A=9'), []);
     expect(text).toBe(`${GENERATED_HEADER}\nA=9\nB=2\nA=9\n`);
   });
@@ -115,7 +116,8 @@ describe('parseLocalEnv', () => {
 });
 
 describe('resolveSource', () => {
-  const resolve = (local) => resolveSource(parseLocalEnv(local), UPSTREAM, PIN);
+  const ROOT = '/work/piece';
+  const resolve = (local) => resolveSource(parseLocalEnv(local), UPSTREAM, PIN, ROOT);
   const failure = (local) => {
     try {
       resolve(local);
@@ -168,6 +170,35 @@ describe('resolveSource', () => {
     const elsewhere = resolve(`DEV_AP_REPO=git@example.com:org/a.git\nDEV_AP_REF=${PIN}`);
     expect(elsewhere.isDefault).toBe(false);
     expect(elsewhere.folder).toBe(sourceFolder('git@example.com:org/a.git', PIN));
+  });
+
+  it('resolves a local path against the repository root, and names the folder from the result', () => {
+    for (const [given, resolved] of [
+      ['../activepieces', '/work/activepieces'],
+      ['./ap', '/work/piece/ap'],
+      ['ap/fork.git', '/work/piece/ap/fork.git'],
+      ['/srv/ap.git', '/srv/ap.git'],
+    ]) {
+      const source = resolve(`DEV_AP_REPO=${given}\nDEV_AP_REF=main`);
+      expect(source.repo).toBe(resolved);
+      expect(source.folder).toBe(sourceFolder(resolved, 'main'));
+    }
+    expect(resolve('DEV_AP_REPO=../a\nDEV_AP_REF=main').folder).toBe(
+      resolve('DEV_AP_REPO=/work/a\nDEV_AP_REF=main').folder
+    );
+  });
+
+  it('leaves a URL as written: a scheme, an scp-like host:path, and a leading - stays refused', () => {
+    expect(isLocalRepoPath('git@example.com:org/repo.git')).toBe(false);
+    expect(isLocalRepoPath('https://example.com/org/repo.git')).toBe(false);
+    expect(isLocalRepoPath('ssh://git@example.com/org/repo.git')).toBe(false);
+    expect(isLocalRepoPath('file:///srv/ap.git')).toBe(false);
+    expect(isLocalRepoPath('../activepieces')).toBe(true);
+    expect(isLocalRepoPath('./with:colon')).toBe(true);
+    expect(isLocalRepoPath('plain')).toBe(true);
+    const url = resolve('DEV_AP_REPO=git@example.com:org/repo.git\nDEV_AP_REF=main');
+    expect(url.repo).toBe('git@example.com:org/repo.git');
+    expect(failure('DEV_AP_REPO=-C\nDEV_AP_REF=main')).toMatch(/DEV_AP_REPO starts with "-"/);
   });
 
   it('refuses a value starting with "-", which git would read as an option', () => {

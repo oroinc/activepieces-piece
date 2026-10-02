@@ -3,6 +3,7 @@
  * packages/orocommerce/test/dev-ap-lib.test.mjs can call them directly.
  */
 import { createHash } from 'node:crypto';
+import { resolve as resolvePath } from 'node:path';
 
 /** Read by dev-ap.mjs to pick the Activepieces checkout. Never copied into .env.dev. */
 export const SOURCE_KEYS = ['DEV_AP_REPO', 'DEV_AP_REF'];
@@ -78,11 +79,21 @@ export function sourceFolder(repo, ref) {
 }
 
 /**
+ * True when git would read the repository as a local path rather than a URL: anything without a
+ * colon (so no scheme and no `host:path`), or starting with `/`, `./` or `../`.
+ */
+export function isLocalRepoPath(repo) {
+  return !repo.includes(':') || /^(\/|\.\.?\/)/.test(repo);
+}
+
+/**
  * Neither key: upstream at .ap-pin in .ap-dev/, as before these keys existed, and so is upstream
  * named explicitly at the pin. Any other source gets a folder of its own, so switching sources never
- * reuses another one's install or dev database.
+ * reuses another one's install or dev database. A local path is resolved against `root` (the
+ * repository root) first, since git would otherwise read a relative one from inside the checkout
+ * folder; the folder name, the marker and every git call then use the absolute path.
  */
-export function resolveSource(settings, upstream, pin) {
+export function resolveSource(settings, upstream, pin, root) {
   const repo = lastValue(settings, 'DEV_AP_REPO');
   const ref = lastValue(settings, 'DEV_AP_REF');
   // Both reach git as positional arguments, where a leading "-" would be read as an option.
@@ -113,7 +124,8 @@ export function resolveSource(settings, upstream, pin) {
       );
     }
   }
-  const sourceRepo = repo || upstream;
+  let sourceRepo = repo || upstream;
+  if (repo && isLocalRepoPath(repo)) sourceRepo = resolvePath(root, repo);
   if (!ref || (sourceRepo === upstream && ref === pin)) {
     return { isDefault: true, repo: upstream, ref: null, folder: DEFAULT_FOLDER };
   }
@@ -204,7 +216,7 @@ export function strayPieceFolders(paths, name, keep, within) {
   const suffix = `${name}/package.json`;
   const folders = paths
     .filter((path) => path.startsWith(`${within}/`))
-    .filter((path) => path === suffix || path.endsWith(`/${suffix}`))
+    .filter((path) => path.endsWith(`/${suffix}`))
     .map((path) => path.slice(0, -'/package.json'.length))
     .filter((folder) => folder !== keep);
   return [...new Set(folders)];
