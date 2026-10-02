@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   GENERATED_HEADER,
   buildEnvDev,
+  changedEnvKeys,
   parseLocalEnv,
+  refProblem,
   resolveSource,
   sourceFolder,
   strayPieceFolders,
+  validMarker,
 } from '../../../scripts/dev-ap-lib.mjs';
 
 const UPSTREAM = 'https://github.com/activepieces/activepieces.git';
@@ -176,6 +179,27 @@ describe('resolveSource', () => {
     expect(failure('DEV_AP_REF=-')).toMatch(/DEV_AP_REF starts with "-"/);
   });
 
+  it('refuses a refspec as DEV_AP_REF, which would rewrite the checkout\'s refs', () => {
+    expect(failure('DEV_AP_REF=+main')).toMatch(/DEV_AP_REF is a refspec/);
+    expect(failure('DEV_AP_REF=main:refs/heads/mine')).toMatch(/DEV_AP_REF is a refspec/);
+    expect(failure('DEV_AP_REPO=https://example.com/a.git\nDEV_AP_REF=main:foo')).toMatch(/is a refspec/);
+  });
+
+  it('refuses a name git would refuse, and says why', () => {
+    expect(failure('DEV_AP_REF=a..b')).toMatch(/DEV_AP_REF has "\.\."/);
+    expect(failure('DEV_AP_REF=feature/.hidden')).toMatch(/starting with "\."/);
+    expect(failure('DEV_AP_REF=main.lock')).toMatch(/ending with "\.lock"/);
+    expect(failure('DEV_AP_REF="two words"')).toMatch(/a space/);
+    expect(failure('DEV_AP_REF=main/')).toMatch(/ends with "\/"/);
+    expect(failure('DEV_AP_REF=@')).toMatch(/not a commit, tag or branch name/);
+  });
+
+  it('accepts a branch, a tag with dots and dashes, a path-like branch and a full sha', () => {
+    for (const ref of ['main', '1.2.3-patched', 'v0.1.0-rc.1', 'release/x', 'a'.repeat(40)]) {
+      expect(resolve(`DEV_AP_REF=${ref}`).ref).toBe(ref);
+    }
+  });
+
   it('refuses DEV_AP_REPO without DEV_AP_REF', () => {
     expect(() => resolve('DEV_AP_REPO=https://example.com/a.git')).toThrow(/DEV_AP_REPO but not DEV_AP_REF/);
   });
@@ -205,25 +229,88 @@ describe('resolveSource', () => {
 
 describe('strayPieceFolders', () => {
   const keep = 'packages/pieces/custom/orocommerce';
+  const within = 'packages/pieces';
 
-  it('finds a tracked orocommerce piece anywhere but the custom slot', () => {
+  it('finds a tracked orocommerce piece under packages/pieces, apart from the custom slot', () => {
     expect(
       strayPieceFolders(
         [
           'packages/pieces/community/orocommerce/package.json',
           'packages/pieces/custom/orocommerce/package.json',
-          'orocommerce/package.json',
+          'packages/pieces/orocommerce/package.json',
           'packages/pieces/community/not-orocommerce/package.json',
           'packages/pieces/community/orocommerce/src/index.ts',
           '',
         ],
         'orocommerce',
-        keep
+        keep,
+        within
       )
-    ).toEqual(['packages/pieces/community/orocommerce', 'orocommerce']);
+    ).toEqual(['packages/pieces/community/orocommerce', 'packages/pieces/orocommerce']);
+  });
+
+  it('ignores one outside packages/pieces, where Activepieces never looks', () => {
+    expect(
+      strayPieceFolders(
+        ['orocommerce/package.json', 'docs/orocommerce/package.json', 'packages/piecesx/orocommerce/package.json'],
+        'orocommerce',
+        keep,
+        within
+      )
+    ).toEqual([]);
   });
 
   it('finds nothing in a tree without one', () => {
-    expect(strayPieceFolders([`${keep}/package.json`, ''], 'orocommerce', keep)).toEqual([]);
+    expect(strayPieceFolders([`${keep}/package.json`, ''], 'orocommerce', keep, within)).toEqual([]);
+  });
+});
+
+describe('refProblem', () => {
+  it('passes a full sha without looking further', () => {
+    expect(refProblem('0123456789abcdef0123456789abcdef01234567')).toBeNull();
+  });
+
+  it('refuses a leading "-" before anything else', () => {
+    expect(refProblem('-')).toMatch(/starts with "-"/);
+    expect(refProblem('--upload-pack=x')).toMatch(/starts with "-"/);
+  });
+});
+
+describe('validMarker', () => {
+  const sha = 'b'.repeat(40);
+
+  it('keeps only the three fields, when all three are sound', () => {
+    expect(validMarker({ repo: 'r', ref: 'main', commit: sha, extra: 1 })).toEqual({
+      repo: 'r',
+      ref: 'main',
+      commit: sha,
+    });
+  });
+
+  it('is null for a missing or short commit, a missing field, or no object at all', () => {
+    expect(validMarker({ repo: 'r', ref: 'main' })).toBeNull();
+    expect(validMarker({ repo: 'r', ref: 'main', commit: 'abc' })).toBeNull();
+    expect(validMarker({ repo: 'r', ref: 'main', commit: null })).toBeNull();
+    expect(validMarker({ ref: 'main', commit: sha })).toBeNull();
+    expect(validMarker(null)).toBeNull();
+    expect(validMarker('text')).toBeNull();
+  });
+});
+
+describe('changedEnvKeys', () => {
+  it('names the keys changed, added or removed by hand, sorted, and never the values', () => {
+    const existing = 'AP_DB_TYPE=POSTGRES\nAP_LOG_LEVEL=debug\nAP_FRONTEND_URL=http://x\n';
+    const keys = changedEnvKeys(existing, COMMITTED);
+    expect(keys).toEqual(['AP_DB_TYPE', 'AP_DEV_PIECES', 'AP_FRONTEND_URL', 'AP_JWT_SECRET', 'AP_QUEUE_UI_PASSWORD']);
+    expect(keys.join(' ')).not.toContain('POSTGRES');
+  });
+
+  it('leaves out the keys told to ignore, and is empty for an unchanged file', () => {
+    expect(changedEnvKeys(`${COMMITTED}AP_DEV_PIECES="orocommerce"\n`, COMMITTED, ['AP_DEV_PIECES'])).toEqual([]);
+    expect(changedEnvKeys(COMMITTED, COMMITTED)).toEqual([]);
+  });
+
+  it('skips lines that are not KEY=value, as dotenv does', () => {
+    expect(changedEnvKeys(`export A=1\n${COMMITTED}`, COMMITTED)).toEqual([]);
   });
 });

@@ -39,10 +39,13 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_FOLDER,
+  GENERATED_HEADER,
   buildEnvDev,
+  changedEnvKeys,
   parseLocalEnv,
   resolveSource,
   strayPieceFolders,
+  validMarker,
 } from './dev-ap-lib.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -59,6 +62,9 @@ const MARKER_FILE = '.dev-ap-source.json';
 
 /** The folder name Activepieces matches AP_DEV_PIECES against. */
 const PIECE_FOLDER = 'orocommerce';
+
+/** Where Activepieces looks for pieces, and so the only place a second folder of ours matters. */
+const PIECES_ROOT = 'packages/pieces';
 
 /**
  * Upstream keeps custom pieces in packages/pieces/custom/* (an empty, already-globbed workspace
@@ -379,6 +385,7 @@ function writeEnvDev(devDir, local) {
   }
   const { text, applied, ignored } = buildEnvDev(committed.stdout, local, ENV_SETTINGS);
   for (const key of ignored) console.warn(`.env.dev.local: ${key} is ignored, this script always sets it.`);
+  warnAboutHandEdits(devDir, committed.stdout);
   writeFileSync(join(devDir, '.env.dev'), text);
   console.log(
     `.env.dev: rebuilt from the committed one, with ${ENV_SETTINGS.map(([k, v]) => `${k}=${v}`).join(', ')}.`
@@ -387,6 +394,26 @@ function writeEnvDev(devDir, local) {
     // Keys only: the values are the developer's and may be secrets.
     console.log(`.env.dev: from .env.dev.local, ${applied.join(', ')}.`);
   }
+}
+
+/**
+ * A .env.dev without the generated header was written by an earlier version of this script, or by
+ * hand. Once, before it is replaced, name the keys that are about to go, so that the developer can
+ * move them to .env.dev.local. Names only: the values may be secrets. The script's own two keys
+ * are left out, since every run sets them anyway.
+ */
+function warnAboutHandEdits(devDir, committed) {
+  const path = join(devDir, '.env.dev');
+  if (!existsSync(path)) return;
+  const existing = readFileSync(path, 'utf8');
+  if (existing.startsWith(GENERATED_HEADER)) return;
+  const keys = changedEnvKeys(existing, committed, ENV_SETTINGS.map(([key]) => key));
+  if (keys.length === 0) return;
+  console.warn(
+    `Warning: ${relative(REPO_ROOT, path)} was edited by hand and is rebuilt now. These keys differ ` +
+      `from the committed file and are lost: ${keys.join(', ')}.\n` +
+      'Put the ones you still need in .env.dev.local at the repository root, then run again.'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -449,13 +476,25 @@ function formatSize(dir) {
   return kib >= 1024 * 1024 ? `${(kib / 1024 / 1024).toFixed(1)} GB` : `${Math.ceil(kib / 1024)} MB`;
 }
 
+/** The checkout's marker, or null when the file is missing, unreadable or incomplete. */
 function readMarker(devDir) {
   try {
-    const marker = readJson(join(devDir, MARKER_FILE));
-    return typeof marker.repo === 'string' && typeof marker.ref === 'string' ? marker : null;
+    return validMarker(readJson(join(devDir, MARKER_FILE)));
   } catch {
     return null;
   }
+}
+
+/** The checkout's HEAD, or a refusal: a sha this cannot read is not one to build on. */
+function readHead(devDir, folder) {
+  const head = capture('git', ['-C', devDir, 'rev-parse', 'HEAD']);
+  if (head === null) {
+    die(
+      `${folder} has a .git folder, but \`git rev-parse HEAD\` fails in it, so the checkout cannot ` +
+        'be trusted. Delete it and run again:\n  npm run dev:ap -- --reset'
+    );
+  }
+  return head;
 }
 
 function describeSource(repo, ref) {
@@ -558,7 +597,7 @@ function prepareDefault(devDir, pin) {
     if (!existsSync(join(devDir, '.git'))) {
       die(`.ap-dev exists but is not a git checkout. Delete it and run again:\n  rm -rf ${devDir}`);
     }
-    const head = capture('git', ['-C', devDir, 'rev-parse', 'HEAD']);
+    const head = readHead(devDir, DEFAULT_FOLDER);
     if (head !== pin) {
       die(
         `.ap-dev is at ${head}, but .ap-pin says ${pin}.\n` +
@@ -569,7 +608,7 @@ function prepareDefault(devDir, pin) {
       );
     }
     console.log('.ap-dev: reusing the existing checkout.');
-    return { head, isFresh: false };
+    return { head };
   }
   console.log(
     '.ap-dev: first run, cloning Activepieces. Expect 1 to 15 minutes depending on the network, ' +
@@ -580,7 +619,7 @@ function prepareDefault(devDir, pin) {
   run('git', ['-C', devDir, 'checkout', '--quiet', pin]);
   const seconds = ((Date.now() - started) / 1000).toFixed(0);
   console.log(`.ap-dev: cloned in ${seconds}s. The install below adds roughly 2.5 GB more.`);
-  return { head: pin, isFresh: true };
+  return { head: pin };
 }
 
 /**
@@ -589,6 +628,15 @@ function prepareDefault(devDir, pin) {
  */
 function prepareSource(source, devDir) {
   const { folder, repo, ref } = source;
+  if (existsSync(devDir)) {
+    const marker = readMarker(devDir);
+    // The marker is written last, after the fetch. A folder without it, and without an install,
+    // is one an interrupted first run left behind: nothing in it is worth keeping.
+    if (!marker && !existsSync(join(devDir, 'node_modules'))) {
+      console.log(`${folder}: an earlier fetch did not finish. Deleting it and fetching again.`);
+      rmSync(devDir, { recursive: true, force: true });
+    }
+  }
   if (existsSync(devDir)) {
     if (!existsSync(join(devDir, '.git'))) {
       die(`${folder} exists but is not a git checkout. Delete it and run again:\n  rm -rf ${devDir}`);
@@ -600,13 +648,13 @@ function prepareSource(source, devDir) {
           'is not reused. Delete it and run again:\n  npm run dev:ap -- --reset'
       );
     }
-    const head = capture('git', ['-C', devDir, 'rev-parse', 'HEAD']);
+    const head = readHead(devDir, folder);
     console.log(
       `${folder}: reusing the checkout of ${ref} at ${marker.commit}, without fetching. For newer ` +
         'commits on a branch, delete it with --reset and run again.'
     );
     if (head !== marker.commit) console.warn(`Warning: ${folder} has since been moved to ${head}.`);
-    return { head, isFresh: false };
+    return { head };
   }
 
   console.log(`${folder}: first run for this source, fetching ${ref} (depth 1).`);
@@ -637,32 +685,38 @@ function prepareSource(source, devDir) {
     `${folder}: fetched ${ref}${ref === commit ? '' : ` at ${commit}`}. The install below adds ` +
       'roughly 2.5 GB.'
   );
-  return { head: commit, isFresh: true };
+  return { head: commit };
 }
 
 /**
- * Only tracked paths, which is where an old fork branch carries the piece (for example in
- * packages/pieces/community/orocommerce). The copy itself always goes to packages/pieces/custom.
+ * Only tracked paths under packages/pieces, which is where Activepieces looks and where an old fork
+ * branch carries the piece (for example in packages/pieces/community/orocommerce). The copy itself
+ * always goes to packages/pieces/custom. The checkout is kept: deleting it would only make the next
+ * run fetch it again and hit the same refusal.
  */
-function checkStrayPieces(devDir, folder, isFresh) {
+function checkStrayPieces(devDir, folder, isDefault) {
   const listed = spawnSync(
     'git',
-    ['-C', devDir, 'ls-files', '-z', '--', `:(glob)**/${PIECE_FOLDER}/package.json`],
+    ['-C', devDir, 'ls-files', '-z', '--', `:(glob)${PIECES_ROOT}/**/${PIECE_FOLDER}/package.json`],
     { encoding: 'utf8' }
   );
   if (listed.status !== 0) die(`git ls-files failed in ${folder}: ${listed.stderr.trim()}`);
-  const stray = strayPieceFolders(listed.stdout.split('\0'), PIECE_FOLDER, DEV_PIECE_SEGMENTS.join('/'));
+  const stray = strayPieceFolders(
+    listed.stdout.split('\0'),
+    PIECE_FOLDER,
+    DEV_PIECE_SEGMENTS.join('/'),
+    PIECES_ROOT
+  );
   if (stray.length === 0) return;
-  // A checkout fetched a moment ago holds nothing yet: no install and no dev database.
-  if (isFresh) rmSync(devDir, { recursive: true, force: true });
   die(
     `${folder} already has a piece folder named ${PIECE_FOLDER}:\n` +
       stray.map((path) => `  ${folder}/${path}`).join('\n') +
       '\nActivepieces finds dev pieces by folder name, so it could build or serve that one instead ' +
-      `of the copy in ${DEV_PIECE_SEGMENTS.join('/')}. Use a ref without it.\n` +
-      (isFresh
-        ? `${folder} was just fetched and has been deleted again.`
-        : `To delete ${folder}: npm run dev:ap -- --reset`)
+      `of the copy in ${DEV_PIECE_SEGMENTS.join('/')}.\n` +
+      (isDefault
+        ? 'This is upstream at .ap-pin, so the pin itself carries that folder. Move .ap-pin to a ' +
+          'commit without it, or set DEV_AP_REF in .env.dev.local to one meanwhile.'
+        : `Use a ref without it. To delete ${folder}: npm run dev:ap -- --reset`)
   );
 }
 
@@ -675,8 +729,18 @@ async function main() {
   }
 
   const pin = readPin();
-  const local = readLocalEnv();
-  const source = resolveSource(local, UPSTREAM, pin);
+  let local = [];
+  let source;
+  try {
+    local = readLocalEnv();
+    source = resolveSource(local, UPSTREAM, pin);
+  } catch (error) {
+    // --reset is how a developer recovers, so a .env.dev.local it cannot read must not stop it.
+    // Without a source there is no folder to pick, so it offers the default one.
+    if (!doReset) throw error;
+    console.warn(`Warning: ${error.message}\n--reset goes on with ${DEFAULT_FOLDER}/ regardless.`);
+    source = { isDefault: true, repo: UPSTREAM, ref: null, folder: DEFAULT_FOLDER };
+  }
   const devDir = join(REPO_ROOT, source.folder);
   const sourceName = source.isDefault
     ? 'upstream Activepieces at .ap-pin'
@@ -695,16 +759,14 @@ async function main() {
 
   console.log(`Activepieces pin: ${pin}`);
 
-  const { head, isFresh } = source.isDefault
-    ? prepareDefault(devDir, pin)
-    : prepareSource(source, devDir);
+  const { head } = source.isDefault ? prepareDefault(devDir, pin) : prepareSource(source, devDir);
   if (head !== pin) {
     console.warn(
       `Warning: ${source.folder} is at ${head}, not at .ap-pin. The Node and bun checks above and ` +
         'the piece itself are only proven against the pin.'
     );
   }
-  checkStrayPieces(devDir, source.folder, isFresh);
+  checkStrayPieces(devDir, source.folder, source.isDefault);
 
   const copyDir = join(devDir, DEV_PIECE_PATH);
   const isNewCopy = copyPiece(copyDir);

@@ -63,8 +63,10 @@ Your own environment variables go in `.env.dev.local` at the repository root (gi
 layers: the checkout's committed `.env.dev`, then `AP_DEV_PIECES` and `AP_REUSE_SANDBOX`, which the
 script always sets, then `.env.dev.local` on top. So `.env.dev.local` holds only your overrides,
 deleting a line from it brings the committed value back on the next run, and edits made directly in
-the generated file are lost. A line for `AP_DEV_PIECES` or `AP_REUSE_SANDBOX` in `.env.dev.local` is
-ignored with a warning. Shell exports do not work: turbo strips every variable its
+the generated file are lost. A `.env.dev` edited by hand (or left by an older version of the script)
+is rebuilt too, after one warning that names the keys it drops, so they can be moved to
+`.env.dev.local`. A line for `AP_DEV_PIECES` or `AP_REUSE_SANDBOX` in `.env.dev.local` is ignored
+with a warning. Shell exports do not work: turbo strips every variable its
 `globalPassThroughEnv` does not list, apart from system ones such as `PATH`. The few it lists pass
 through, and one of them exported in the shell wins over the file. Restart after editing.
 
@@ -76,21 +78,24 @@ DEV_AP_REF=<commit, tag or branch>
 ```
 
 `DEV_AP_REF` alone takes that ref of upstream; `DEV_AP_REPO` without `DEV_AP_REF` is an error. A
-commit has to be the full sha. Each source gets its own folder, `.ap-dev-<hash>/` (12 hex digits of
+commit has to be the full sha, and a name has to be a plain tag or branch name: a refspec (a `:` or
+a leading `+`) is refused. Each source gets its own folder, `.ap-dev-<hash>/` (12 hex digits of
 a sha256 of repo and ref), with its own install of ~3 GB and its own dev database, while `.ap-dev/`
 stays upstream at `.ap-pin`. The hash takes the repository string as written, so `.../repo` and
 `.../repo.git` are two folders and two installs. `DEV_AP_REF` set to the `.ap-pin` sha, with no
 `DEV_AP_REPO` or with upstream's URL, is the default source and uses `.ap-dev/`. The first run
 fetches only that commit; later runs reuse the folder without fetching, so a branch stays where it
-was until you `--reset` it. A private repository uses your own git credentials (an SSH key or a
-credential helper); the script never prompts for or stores a token. A commit other than `.ap-pin`
-gets a warning, since the Node and bun checks and the piece are only proven against the pin. A ref
-that already has a piece folder named `orocommerce` outside `packages/pieces/custom/` (an old fork
-branch, for example) is refused.
+was until you `--reset` it. A first fetch that was interrupted is redone on the next run. A private
+repository uses your own git credentials (an SSH key or a credential helper); the script never
+prompts for or stores a token. A commit other than `.ap-pin` gets a warning, since the Node and bun
+checks and the piece are only proven against the pin. A ref that already has a piece folder named
+`orocommerce` under `packages/pieces/` other than `packages/pieces/custom/` (an old fork branch, for
+example) is refused, and the checkout is kept.
 
 - `npm run dev:ap -- --reset` deletes the current source's folder after you type `yes`: the checkout,
   its `.env.dev`, and the dev database with the flows and connections made in it. It lists the other
-  `.ap-dev*` folders with their size and leaves them alone. `.env.dev.local` is kept.
+  `.ap-dev*` folders with their size and leaves them alone. `.env.dev.local` is kept, and one the
+  script cannot read is reported without stopping the reset, which then offers `.ap-dev/`.
 
 ## Upgrading Activepieces
 
