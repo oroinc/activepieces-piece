@@ -10,6 +10,7 @@ import {
 } from '../../../scripts/dev-ap-lib.mjs';
 
 const UPSTREAM = 'https://github.com/activepieces/activepieces.git';
+const PIN = 'f'.repeat(40);
 
 /** Shaped like upstream's committed .env.dev: quoted and bare values, a comment, a blank line. */
 const COMMITTED = [
@@ -111,7 +112,15 @@ describe('parseLocalEnv', () => {
 });
 
 describe('resolveSource', () => {
-  const resolve = (local) => resolveSource(parseLocalEnv(local), UPSTREAM);
+  const resolve = (local) => resolveSource(parseLocalEnv(local), UPSTREAM, PIN);
+  const failure = (local) => {
+    try {
+      resolve(local);
+    } catch (error) {
+      return error.message;
+    }
+    return null;
+  };
   const hash12 = (text) => createHash('sha256').update(text).digest('hex').slice(0, 12);
 
   it('is upstream at .ap-pin in .ap-dev with neither key, or with both empty', () => {
@@ -149,23 +158,48 @@ describe('resolveSource', () => {
     expect(folders.size).toBe(3);
   });
 
+  it('is the default source when DEV_AP_REF is the .ap-pin sha of upstream, named or not', () => {
+    const expected = { isDefault: true, repo: UPSTREAM, ref: null, folder: '.ap-dev' };
+    expect(resolve(`DEV_AP_REF=${PIN}`)).toEqual(expected);
+    expect(resolve(`DEV_AP_REPO=${UPSTREAM}\nDEV_AP_REF=${PIN}`)).toEqual(expected);
+    const elsewhere = resolve(`DEV_AP_REPO=git@example.com:org/a.git\nDEV_AP_REF=${PIN}`);
+    expect(elsewhere.isDefault).toBe(false);
+    expect(elsewhere.folder).toBe(sourceFolder('git@example.com:org/a.git', PIN));
+  });
+
+  it('refuses a value starting with "-", which git would read as an option', () => {
+    expect(failure("DEV_AP_REF=--upload-pack=sh -c 'echo INJECTED >&2; exit 1'")).toMatch(
+      /DEV_AP_REF starts with "-"/
+    );
+    expect(failure('DEV_AP_REPO=--upload-pack=x\nDEV_AP_REF=main')).toMatch(/DEV_AP_REPO starts with "-"/);
+    expect(failure('DEV_AP_REPO=-\nDEV_AP_REF=main')).toMatch(/DEV_AP_REPO starts with "-"/);
+    expect(failure('DEV_AP_REF=-')).toMatch(/DEV_AP_REF starts with "-"/);
+  });
+
   it('refuses DEV_AP_REPO without DEV_AP_REF', () => {
     expect(() => resolve('DEV_AP_REPO=https://example.com/a.git')).toThrow(/DEV_AP_REPO but not DEV_AP_REF/);
   });
 
-  it('refuses a password or token in the URL, and does not repeat it', () => {
-    const attempt = () => resolve('DEV_AP_REPO=https://user:s3cret@example.com/a.git\nDEV_AP_REF=main');
-    expect(attempt).toThrow(/password or token/);
-    let message = '';
-    try {
-      attempt();
-    } catch (error) {
-      message = error.message;
+  it('refuses any user name, password or token in an http(s) URL, and does not repeat it', () => {
+    for (const url of [
+      'https://user:s3cret@example.com/a.git',
+      'https://ghp_s3cret@github.com/org/a.git',
+      'http://s3cret@example.com/a.git',
+    ]) {
+      const message = failure(`DEV_AP_REPO=${url}\nDEV_AP_REF=main`);
+      expect(message).toMatch(/user name, password or token/);
+      expect(message).not.toContain('s3cret');
     }
-    expect(message).not.toContain('s3cret');
-    expect(resolve('DEV_AP_REPO=git@example.com:org/a.git\nDEV_AP_REF=main').repo).toBe(
-      'git@example.com:org/a.git'
-    );
+  });
+
+  it('accepts both SSH forms, and an @ in the path of an https URL', () => {
+    for (const url of [
+      'ssh://git@example.com/org/a.git',
+      'git@example.com:org/a.git',
+      'https://example.com/org/a@b.git',
+    ]) {
+      expect(resolve(`DEV_AP_REPO=${url}\nDEV_AP_REF=main`).repo).toBe(url);
+    }
   });
 });
 

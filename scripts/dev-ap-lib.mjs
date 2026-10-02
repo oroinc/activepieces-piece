@@ -45,12 +45,25 @@ export function sourceFolder(repo, ref) {
 }
 
 /**
- * Neither key: upstream at .ap-pin in .ap-dev/, as before these keys existed. Any other source gets
- * a folder of its own, so switching sources never reuses another one's install or dev database.
+ * Neither key: upstream at .ap-pin in .ap-dev/, as before these keys existed, and so is upstream
+ * named explicitly at the pin. Any other source gets a folder of its own, so switching sources never
+ * reuses another one's install or dev database.
  */
-export function resolveSource(settings, upstream) {
+export function resolveSource(settings, upstream, pin) {
   const repo = lastValue(settings, 'DEV_AP_REPO');
   const ref = lastValue(settings, 'DEV_AP_REF');
+  // Both reach git as positional arguments, where a leading "-" would be read as an option.
+  for (const [key, value] of [
+    ['DEV_AP_REPO', repo],
+    ['DEV_AP_REF', ref],
+  ]) {
+    if (value.startsWith('-')) {
+      throw new Error(
+        `.env.dev.local: ${key} starts with "-", which git would read as an option, not as a ` +
+          'repository or a ref. Remove it.'
+      );
+    }
+  }
   if (repo && !ref) {
     throw new Error(
       '.env.dev.local sets DEV_AP_REPO but not DEV_AP_REF.\n' +
@@ -58,13 +71,17 @@ export function resolveSource(settings, upstream) {
         'DEV_AP_REPO to run upstream Activepieces at .ap-pin.'
     );
   }
-  if (!ref) return { isDefault: true, repo: upstream, ref: null, folder: DEFAULT_FOLDER };
   const sourceRepo = repo || upstream;
-  // The URL is printed, kept in the checkout's git config and in its marker file.
-  if (/^[a-z][a-z0-9+.-]*:\/\/[^/@]*:[^/@]*@/i.test(sourceRepo)) {
+  if (!ref || (sourceRepo === upstream && ref === pin)) {
+    return { isDefault: true, repo: upstream, ref: null, folder: DEFAULT_FOLDER };
+  }
+  // The URL is printed, kept in the checkout's git config and in its marker file. Over http(s),
+  // anything before "@" in the authority is a credential, a token as the user name included.
+  if (/^https?:\/\/[^/]*@/i.test(sourceRepo)) {
     throw new Error(
-      '.env.dev.local: DEV_AP_REPO has a password or token in the URL. Remove it: git uses your own ' +
-        'credentials (an SSH key or a credential helper), and this script never stores one.'
+      '.env.dev.local: DEV_AP_REPO has a user name, password or token in the URL. Remove it: over ' +
+        'https, git takes your credentials from a credential helper, or use an SSH URL. This script ' +
+        'never stores one.'
     );
   }
   return { isDefault: false, repo: sourceRepo, ref, folder: sourceFolder(sourceRepo, ref) };

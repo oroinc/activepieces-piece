@@ -78,12 +78,15 @@ DEV_AP_REF=<commit, tag or branch>
 `DEV_AP_REF` alone takes that ref of upstream; `DEV_AP_REPO` without `DEV_AP_REF` is an error. A
 commit has to be the full sha. Each source gets its own folder, `.ap-dev-<hash>/` (12 hex digits of
 a sha256 of repo and ref), with its own install of ~3 GB and its own dev database, while `.ap-dev/`
-stays upstream at `.ap-pin`. The first run fetches only that commit; later runs reuse the folder
-without fetching, so a branch stays where it was until you `--reset` it. A private repository uses
-your own git credentials (an SSH key or a credential helper); the script never prompts for or stores
-a token. A commit other than `.ap-pin` gets a warning, since the Node and bun checks and the piece
-are only proven against the pin. A ref that already has a piece folder named `orocommerce` outside
-`packages/pieces/custom/` (an old fork branch, for example) is refused.
+stays upstream at `.ap-pin`. The hash takes the repository string as written, so `.../repo` and
+`.../repo.git` are two folders and two installs. `DEV_AP_REF` set to the `.ap-pin` sha, with no
+`DEV_AP_REPO` or with upstream's URL, is the default source and uses `.ap-dev/`. The first run
+fetches only that commit; later runs reuse the folder without fetching, so a branch stays where it
+was until you `--reset` it. A private repository uses your own git credentials (an SSH key or a
+credential helper); the script never prompts for or stores a token. A commit other than `.ap-pin`
+gets a warning, since the Node and bun checks and the piece are only proven against the pin. A ref
+that already has a piece folder named `orocommerce` outside `packages/pieces/custom/` (an old fork
+branch, for example) is refused.
 
 - `npm run dev:ap -- --reset` deletes the current source's folder after you type `yes`: the checkout,
   its `.env.dev`, and the dev database with the flows and connections made in it. It lists the other

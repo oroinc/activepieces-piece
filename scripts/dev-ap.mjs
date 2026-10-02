@@ -462,11 +462,19 @@ function describeSource(repo, ref) {
   return `${repo === UPSTREAM ? 'upstream Activepieces' : repo} at ${ref}`;
 }
 
+/** False for anything that fails to stat, such as a broken symlink: not a checkout, so not listed. */
+function isDirectory(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 /** Every checkout but the current one: each source has its own, and --reset only ever deletes that. */
 function listOtherCheckouts(folder) {
   const others = readdirSync(REPO_ROOT).filter(
-    (name) =>
-      name.startsWith(DEFAULT_FOLDER) && name !== folder && statSync(join(REPO_ROOT, name)).isDirectory()
+    (name) => name.startsWith(DEFAULT_FOLDER) && name !== folder && isDirectory(join(REPO_ROOT, name))
   );
   if (others.length === 0) return;
   console.log('Other checkouts, which --reset does not touch:');
@@ -605,10 +613,12 @@ function prepareSource(source, devDir) {
   mkdirSync(devDir);
   try {
     run('git', ['-c', 'init.defaultBranch=main', 'init', '--quiet', devDir]);
-    run('git', ['-C', devDir, 'remote', 'add', 'origin', repo]);
+    // "--" so that neither value can be read as a git option; resolveSource refuses a leading "-"
+    // as well, so this is the second line of defence.
+    run('git', ['-C', devDir, 'remote', 'add', 'origin', '--', repo]);
     // No terminal prompt: git uses the credentials it already has (an SSH key or a credential
     // helper) or fails, and this script never asks for a token or keeps one.
-    run('git', ['-C', devDir, 'fetch', '--depth', '1', 'origin', ref], {
+    run('git', ['-C', devDir, 'fetch', '--depth', '1', 'origin', '--', ref], {
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     });
     run('git', ['-C', devDir, 'checkout', '--quiet', 'FETCH_HEAD']);
@@ -664,8 +674,9 @@ async function main() {
     );
   }
 
+  const pin = readPin();
   const local = readLocalEnv();
-  const source = resolveSource(local, UPSTREAM);
+  const source = resolveSource(local, UPSTREAM, pin);
   const devDir = join(REPO_ROOT, source.folder);
   const sourceName = source.isDefault
     ? 'upstream Activepieces at .ap-pin'
@@ -682,7 +693,6 @@ async function main() {
   checkDeno();
   await checkPorts();
 
-  const pin = readPin();
   console.log(`Activepieces pin: ${pin}`);
 
   const { head, isFresh } = source.isDefault
