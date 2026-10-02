@@ -1,7 +1,11 @@
-import { Agent } from 'undici';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+import { Agent, type Dispatcher } from 'undici';
 
 import { httpClient } from '@activepieces/pieces-common';
 import type { SendRequestOptions } from '@activepieces/pieces-common';
+
+import type { OroAuth } from './types';
 
 /**
  * Keep certificate verification on for every request this piece makes.
@@ -34,10 +38,43 @@ import type { SendRequestOptions } from '@activepieces/pieces-common';
  */
 const verifyingAgent = new Agent({ connect: { rejectUnauthorized: true } });
 
+/**
+ * For a connection whose "Verify TLS certificate" is off: a private or self-signed server the user
+ * trusts. It is handed to that connection's requests one by one, like the verifying agent, so nothing
+ * else changes: no environment variable, no global dispatcher, and every other connection and piece
+ * in the worker keeps verifying.
+ */
+const nonVerifyingAgent = new Agent({ connect: { rejectUnauthorized: false } });
+
+/**
+ * The one place that decides how a request reaches the connection's server. Anything later added to
+ * that, such as a proxy, belongs here, so every request path picks it up at once.
+ *
+ * Only an explicit false turns verification off. A connection saved before the option existed has no
+ * value for it at all, and it keeps verifying, as does a request made with no connection.
+ */
+export function dispatcherForConnection({ auth }: { auth: OroAuth | undefined }): Dispatcher {
+  return auth?.props.verifyTlsCertificate === false ? nonVerifyingAgent : verifyingAgent;
+}
+
+/**
+ * The connection of a call into upstream code that sends its request with no options, which is how
+ * the Custom API Call reaches the client: there is no argument to carry the connection, so it travels
+ * with the async context instead. The store is this module's own and only the patch below reads it.
+ */
+const connectionScope = new AsyncLocalStorage<OroAuth>();
+
+export function withConnection<T>({ auth }: { auth: OroAuth }, fn: () => T): T {
+  return connectionScope.run(auth, fn);
+}
+
 export function requestOptionsWithTlsVerification(
   options?: SendRequestOptions
 ): SendRequestOptions {
-  return { ...options, dispatcher: options?.dispatcher ?? verifyingAgent };
+  return {
+    ...options,
+    dispatcher: options?.dispatcher ?? dispatcherForConnection({ auth: connectionScope.getStore() }),
+  };
 }
 
 let patched = false;

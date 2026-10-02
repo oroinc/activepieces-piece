@@ -35,10 +35,21 @@ In Activepieces:
 | **Client ID** / **Client Secret** | from the OAuth application |
 | **Default HTTP Headers** | optional JSON object sent with every request |
 | **Internal infrastructure** | leave off |
+| **Verify TLS certificate** | leave on, see below |
 
 - The OAuth application's user needs read access to regions: the connection check reads one.
 - The OAuth application's organization limits what the connection can see. A record from another
   organization returns `403 No access to the entity`. Use one connection per organization.
+
+### Private certificates
+
+For a server whose certificate comes from a private CA, prefer trusting that CA over turning
+verification off: set `NODE_EXTRA_CA_CERTS` to the CA file (PEM) on the worker container and
+`AP_SANDBOX_PROPAGATED_ENV_VARS=NODE_EXTRA_CA_CERTS` on the app container (both on the one container
+in the default single-container setup). The worker starts the engine with an allowlisted
+environment, so the first setting alone does not reach the piece. Restart after changing either.
+Turning **Verify TLS certificate** off is the alternative for a trusted internal URL; it affects
+that connection only.
 
 ## Actions
 

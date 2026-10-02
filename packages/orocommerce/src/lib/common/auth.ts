@@ -55,7 +55,16 @@ Authenticate to OroCommerce APIs using OAuth 2.0 Client Credentials.
         ' with values provied in ENV variables.',
       required: true,
       defaultValue: false,
-    })
+    }),
+    // Optional, so a connection saved before it existed stays valid; with no value it verifies.
+    verifyTlsCertificate: Property.Checkbox({
+      displayName: 'Verify TLS certificate',
+      description:
+        'Turn off only for a private or self-signed server you trust, for example an internal' +
+        ' OroCloud URL. Adding its CA certificate is safer (see the README).',
+      required: false,
+      defaultValue: true,
+    }),
   },
 
   validate: async ({ auth }): Promise<{ valid: true } | { valid: false; error: string }> => {

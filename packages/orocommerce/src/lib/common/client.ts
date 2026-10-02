@@ -19,8 +19,8 @@ import {
   type FetchCollectionParams,
 } from './types';
 import { jsonApiBodyUtils } from './jsonapi';
-// Imported for its side effect: installing it here covers every caller of the shared client.
-import './tls';
+// Importing it also installs its patch on the shared client, which covers every caller of it.
+import { dispatcherForConnection } from './tls';
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 const inFlightTokenRequests = new Map<string, Promise<string>>();
@@ -203,7 +203,7 @@ export async function oroApiCall({
       },
       queryParams,
       body: sanitizeJsonApiBody({ body }),
-    });
+    }, { dispatcher: dispatcherForConnection({ auth }) });
 
   try {
     const token = await getAccessToken({ auth });
@@ -282,7 +282,7 @@ async function requestAccessToken({
       client_id: auth.props.clientId,
       client_secret: auth.props.clientSecret,
     }).toString(),
-  });
+  }, { dispatcher: dispatcherForConnection({ auth }) });
 
   const token = response.body.access_token;
   tokenCache.set(cacheKey, {
