@@ -69,16 +69,29 @@ async function runWithStaleTokenRetry(context: RunContext): Promise<unknown> {
   }
 
   if (!(first.error instanceof HttpError) || first.error.response.status !== 401) {
-    throw new Error(formatError({ error: first.error }));
+    throw first.error;
   }
 
   invalidateAccessToken({ auth, token: usedToken });
 
-  const retry = await tryCatch(() => upstreamRun(context));
-  if (retry.error) {
-    throw new Error(formatError({ error: retry.error }));
+  return await upstreamRun(context);
+}
+
+/**
+ * Report every failure the way oroApiCall does: the status and the response body, nothing else.
+ *
+ * Upstream's HttpError writes the request body into its message, and the message is what the run
+ * shows as the step's error. Two paths used to throw past formatError - the token fetched before
+ * the first call, and the second run after a 401 returned as output - and on a failed token request
+ * that body is the client id and secret. Formatting here, where every error leaves, covers both and
+ * any path added later.
+ */
+async function runWithFormattedErrors(context: RunContext): Promise<unknown> {
+  const { data, error } = await tryCatch(() => runWithStaleTokenRetry(context));
+  if (error) {
+    throw new Error(formatError({ error }));
   }
-  return retry.data;
+  return data;
 }
 
 function isUnauthorizedOutput(value: unknown): boolean {
@@ -101,7 +114,7 @@ const mutable = upstreamAction as unknown as {
   run: (context: RunContext) => Promise<unknown>;
   test: (context: RunContext) => Promise<unknown>;
 };
-mutable.run = runWithStaleTokenRetry;
-mutable.test = runWithStaleTokenRetry;
+mutable.run = runWithFormattedErrors;
+mutable.test = runWithFormattedErrors;
 
 export const customApiCallAction = upstreamAction;

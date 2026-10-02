@@ -181,10 +181,11 @@ export async function oroApiCall({
   headers: extraHeaders,
   throwOriginalError = false
 }: OroApiCallParams): Promise<HttpResponse<HttpMessageBody>> {
-  const sendRequest = async ({ token }: { token: string }): Promise<HttpResponse<HttpMessageBody>> =>
-    await httpClient.sendRequest({
+  const sendRequest = async ({ token }: { token: string }): Promise<HttpResponse<HttpMessageBody>> => {
+    const response = await httpClient.sendRequest({
       method,
       url: `${getOroAdminApiBaseUrl({ auth })}/${resourceUri.replace(/^\/+/, '')}`,
+      followRedirects: false,
       headers: {
         'Content-Type': 'application/vnd.api+json',
         // Stripped once more over the merged set: the shared client applies `authentication` first
@@ -204,6 +205,9 @@ export async function oroApiCall({
       queryParams,
       body: sanitizeJsonApiBody({ body }),
     });
+    failOnRedirect({ response });
+    return response;
+  };
 
   try {
     const token = await getAccessToken({ auth });
@@ -273,6 +277,7 @@ async function requestAccessToken({
   const response = await httpClient.sendRequest<OroAuthResponseType>({
     method: HttpMethod.POST,
     url: `${getOroServerUrl(auth)}/oauth2-token`,
+    followRedirects: false,
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       ...getInternalInfrastructureHeaders({ auth }),
@@ -282,8 +287,11 @@ async function requestAccessToken({
       client_id: auth.props.clientId,
       client_secret: auth.props.clientSecret,
     }).toString(),
+  }).catch((error: unknown) => {
+    throw withoutRequestBody({ error });
   });
 
+  failOnRedirect({ response });
   const token = response.body.access_token;
   tokenCache.set(cacheKey, {
     token,
@@ -291,6 +299,47 @@ async function requestAccessToken({
   });
 
   return token;
+}
+
+/**
+ * The token request's error, without the request body.
+ *
+ * Upstream's HttpError keeps the request body and writes it into its message, and the body of the
+ * token request is the client id and secret, so whatever catches the error - a step, a dropdown, a
+ * log line - would hold the secret in plain text. Rebuilt with the same status and response body, it
+ * is still an HttpError: every check for a 401 reads it as before, and formatError prints the same
+ * text.
+ */
+function withoutRequestBody({ error }: { error: unknown }): unknown {
+  if (!(error instanceof HttpError)) {
+    return error;
+  }
+  return new HttpError(undefined, {
+    status: error.response.status,
+    responseBody: error.response.body,
+  });
+}
+
+/**
+ * Fail on a redirect instead of following it.
+ *
+ * Following one goes wrong without a word. fetch drops the Authorization header when the redirect
+ * leaves the host, and on a 301 or 302 it turns a POST into a GET with no body. So a create action
+ * redirected to a login page, a challenge page or another host reported success with whatever that
+ * address returned, and nothing was created. Requests here go out with followRedirects off, and the
+ * shared client then hands a 3xx back as a success, so it is turned into an error here. The message
+ * holds the status and the Location only: that address is what the Server URL should be.
+ */
+function failOnRedirect({ response }: { response: HttpResponse<unknown> }): void {
+  if (response.status < 300 || response.status >= 400) {
+    return;
+  }
+  const location = response.headers?.['location'];
+  const target = typeof location === 'string' && location !== '' ? ` to ${location}` : '';
+  throw new Error(
+    `The server answered with a redirect (${response.status})${target}. ` +
+      "Redirects are not followed, so set the connection's Server URL to the final address."
+  );
 }
 
 export function invalidateAccessToken({ auth, token }: { auth: OroAuth; token: string }): void {
