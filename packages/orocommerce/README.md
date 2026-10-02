@@ -51,6 +51,16 @@ environment, so the first setting alone does not reach the piece. Restart after 
 Turning **Verify TLS certificate** off is the alternative for a trusted internal URL; it affects
 that connection only.
 
+### Proxy
+
+Requests go through the proxy named in `https_proxy`, `http_proxy` and `no_proxy` (or the upper-case
+names). These reach the piece the same way as the CA file above: set them on the worker container
+and list the same names in `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container (one comma-separated
+list, next to `NODE_EXTRA_CA_CERTS` if that is set), then restart. With none of them set, requests
+connect directly, as before. **Verify TLS certificate** applies through the proxy too. Proxy
+credentials go in the proxy URL, for example `http://user:password@proxy.internal:3128`. An https
+proxy with its own private CA is not covered.
+
 ### User-Agent
 
 Every request, the token request included, sends `User-Agent: oroinc-piece-orocommerce/<version>`,
