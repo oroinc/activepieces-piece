@@ -17,6 +17,13 @@ const BUNDLE = join(__dirname, '..', 'dist', 'src', 'index.js');
 const CERTIFICATE_ERROR = /DEPTH_ZERO_SELF_SIGNED_CERT|self[- ]signed certificate/i;
 const PROXY_VARIABLES = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY', 'no_proxy', 'NO_PROXY'];
 const SWITCH_ON = { NODE_USE_ENV_PROXY: '1' };
+/**
+ * Node 20 has no such switch: its fetch never follows the proxy variables, and neither does the
+ * piece. The cases that need the proxy run only on a Node that has the option.
+ */
+const NODE_HAS_ENV_PROXY = process.allowedNodeEnvironmentFlags.has('--use-env-proxy');
+const itWithEnvProxy = NODE_HAS_ENV_PROXY ? it : it.skip;
+const describeWithEnvProxy = NODE_HAS_ENV_PROXY ? describe : describe.skip;
 
 type Seen = { request: string; remotePort: number | undefined; proxyAuthorization?: string };
 type Tunnel = { authority: string; proxyAuthorization?: string; upstreamPort: number };
@@ -253,12 +260,15 @@ describeIfBuilt('the built artifact behind a proxy', () => {
   }, 60_000);
 
   describe('uses the proxy only when Node\'s own switch is on', () => {
-    // Node leaves fetch direct in each of these; so does the piece.
+    // Node leaves fetch direct in each of these; so does the piece. A Node without the option refuses
+    // to start with it in NODE_OPTIONS, and ignores NODE_USE_ENV_PROXY.
     it.each([
       ['no switch', {}],
       ['NODE_USE_ENV_PROXY=true', { NODE_USE_ENV_PROXY: 'true' }],
       ['NODE_USE_ENV_PROXY=0', { NODE_USE_ENV_PROXY: '0' }],
-      ['NODE_USE_ENV_PROXY=1 turned off by --no-use-env-proxy', { ...SWITCH_ON, NODE_OPTIONS: '--no-use-env-proxy' }],
+      NODE_HAS_ENV_PROXY
+        ? ['NODE_USE_ENV_PROXY=1 turned off by --no-use-env-proxy', { ...SWITCH_ON, NODE_OPTIONS: '--no-use-env-proxy' }]
+        : ['NODE_USE_ENV_PROXY=1 on a Node without the option', SWITCH_ON],
     ])('connects directly with the proxy variables set and %s', async (_label, env) => {
       const outcomes = await runChild({
         script: childScript({ serverUrl: httpUrl(), verify: true }),
@@ -271,7 +281,7 @@ describeIfBuilt('the built artifact behind a proxy', () => {
       expect(tunnels).toEqual([]);
     }, 60_000);
 
-    it.each([
+    itWithEnvProxy.each([
       ['NODE_USE_ENV_PROXY=1', SWITCH_ON],
       ['--use-env-proxy in NODE_OPTIONS', { NODE_OPTIONS: '--max-old-space-size=512 --use-env-proxy' }],
     ])('goes through the proxy with %s', async (_label, env) => {
@@ -286,7 +296,7 @@ describeIfBuilt('the built artifact behind a proxy', () => {
     }, 60_000);
   });
 
-  it.each(['HTTPS_PROXY', 'https_proxy'])(
+  itWithEnvProxy.each(['HTTPS_PROXY', 'https_proxy'])(
     'sends every request to an https server through %s',
     async (variable) => {
       const outcomes = await runChild({
@@ -302,7 +312,7 @@ describeIfBuilt('the built artifact behind a proxy', () => {
     60_000
   );
 
-  it('sends every request to a plain http server through http_proxy', async () => {
+  itWithEnvProxy('sends every request to a plain http server through http_proxy', async () => {
     const outcomes = await runChild({
       script: childScript({ serverUrl: httpUrl(), verify: true }),
       env: { http_proxy: proxyUrl, ...SWITCH_ON },
@@ -314,7 +324,7 @@ describeIfBuilt('the built artifact behind a proxy', () => {
   }, 60_000);
 
   // The same choices Node's fetch makes for the other pieces.
-  describe('reads the variables the way Node\'s fetch does', () => {
+  describeWithEnvProxy('reads the variables the way Node\'s fetch does', () => {
     it.each([
       ['https_proxy', 'HTTPS_PROXY', httpsUrl, httpsSeen],
       ['http_proxy', 'HTTP_PROXY', httpUrl, httpSeen],
@@ -354,7 +364,7 @@ describeIfBuilt('the built artifact behind a proxy', () => {
     }, 60_000);
   });
 
-  describe('keeps the connection\'s certificate choice through the proxy', () => {
+  describeWithEnvProxy('keeps the connection\'s certificate choice through the proxy', () => {
     it('refuses a self-signed server when verification is on', async () => {
       const outcomes = await runChild({
         script: childScript({ serverUrl: httpsUrl(), verify: true }),
@@ -435,7 +445,7 @@ describeIfBuilt('the built artifact behind a proxy', () => {
     expect(tunnels).toEqual([]);
   }, 60_000);
 
-  it('sends the credentials in the proxy URL to the proxy only', async () => {
+  itWithEnvProxy('sends the credentials in the proxy URL to the proxy only', async () => {
     const outcomes = await runChild({
       script: childScript({ serverUrl: httpUrl(), verify: true }),
       env: { http_proxy: proxyUrl.replace('http://', 'http://u:p@'), ...SWITCH_ON },
