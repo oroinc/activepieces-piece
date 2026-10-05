@@ -51,15 +51,23 @@ environment, so the first setting alone does not reach the piece. Restart after 
 Turning **Verify TLS certificate** off is the alternative for a trusted internal URL; it affects
 that connection only.
 
+For connections with **Internal infrastructure** on, `ORO_SERVER_VERIFY_TLS` on the worker container
+overrides **Verify TLS certificate**: `false`, `0`, `no` or `off` turns verification off, and `true`,
+`1`, `yes` or `on` turns it on, in any case. Unset or empty, each connection's own setting decides;
+any other value verifies and logs a warning once. Like `ORO_SERVER_USER_AGENT`, it reaches the piece
+only if `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container lists it; restart after changing it.
+Connections that already exist follow it without being edited. For an internal CA, trusting it with
+`NODE_EXTRA_CA_CERTS` stays the safer choice.
+
 ### Proxy
 
 Requests go through the proxy named in `https_proxy`, `http_proxy` and `no_proxy` (or the upper-case
 names). These reach the piece the same way as the CA file above: set them on the worker container
 and list the same names in `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container (one comma-separated
 list, next to `NODE_EXTRA_CA_CERTS` if that is set), then restart. With none of them set, requests
-connect directly, as before. **Verify TLS certificate** applies through the proxy too. Proxy
-credentials go in the proxy URL, for example `http://user:password@proxy.internal:3128`. An https
-proxy with its own private CA is not covered.
+connect directly, as before. **Verify TLS certificate** and `ORO_SERVER_VERIFY_TLS` apply through
+the proxy too. Proxy credentials go in the proxy URL, for example
+`http://user:password@proxy.internal:3128`. An https proxy with its own private CA is not covered.
 
 ### User-Agent
 

@@ -54,12 +54,20 @@ function oroLike(seen: Seen[]) {
 }
 
 /** Every way the piece reaches Oro, each with its own client secret so each fetches its own token. */
-function childScript({ serverUrl, verify }: { serverUrl: string; verify: boolean }): string {
+function childScript({
+  serverUrl,
+  verify,
+  internal = false,
+}: {
+  serverUrl: string;
+  verify: boolean;
+  internal?: boolean;
+}): string {
   return `
     const { orocommerce } = await import(${JSON.stringify(BUNDLE)});
     const props = (secret) => ({
       serverUrl: ${JSON.stringify(serverUrl)}, adminPrefix: 'admin', clientId: 'client-id', clientSecret: secret,
-      isInternalInfrastructure: false, verifyTlsCertificate: ${verify},
+      isInternalInfrastructure: ${internal}, verifyTlsCertificate: ${verify},
     });
     const auth = (secret) => ({ type: 'CUSTOM_AUTH', props: props(secret) });
     const store = () => {
@@ -107,7 +115,8 @@ function childScript({ serverUrl, verify }: { serverUrl: string; verify: boolean
 /** Spawned, not spawnSync: the servers answering the child live in this process's event loop. */
 function runChild({ script, env }: { script: string; env: Record<string, string> }): Promise<Outcome[]> {
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
-  for (const name of [...PROXY_VARIABLES, 'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_EXTRA_CA_CERTS', 'NODE_USE_ENV_PROXY']) {
+  for (const name of [...PROXY_VARIABLES, 'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_EXTRA_CA_CERTS', 'NODE_USE_ENV_PROXY',
+    'ORO_SERVER_URL', 'ORO_SERVER_VERIFY_TLS']) {
     delete childEnv[name];
   }
   Object.assign(childEnv, env);
@@ -303,6 +312,17 @@ describeIfBuilt('the built artifact behind a proxy', () => {
       expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([]);
       expect(httpsSeen.every(viaProxy)).toBe(true);
       expect(httpsSeen).toHaveLength(EXPECTED_REQUESTS.length);
+    }, 60_000);
+
+    it('reaches it when ORO_SERVER_VERIFY_TLS=false turns verification off for Internal infrastructure', async () => {
+      const outcomes = await runChild({
+        script: childScript({ serverUrl: httpsUrl(), verify: true, internal: true }),
+        env: { https_proxy: proxyUrl, ORO_SERVER_VERIFY_TLS: 'false' },
+      });
+
+      expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([]);
+      expect(httpsSeen.map((seen) => seen.request)).toEqual(EXPECTED_REQUESTS);
+      expect(httpsSeen.every(viaProxy)).toBe(true);
     }, 60_000);
   });
 

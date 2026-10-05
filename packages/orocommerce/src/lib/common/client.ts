@@ -20,7 +20,7 @@ import {
 } from './types';
 import { jsonApiBodyUtils } from './jsonapi';
 // Importing it also installs its patch on the shared client, which covers every caller of it.
-import { dispatcherForConnection } from './tls';
+import { dispatcherForConnection, isInternalInfrastructure } from './tls';
 import { version } from '../../../package.json';
 
 /**
@@ -77,10 +77,6 @@ function getOroServerUrl(auth: OroAuth): string {
   const url = envUrl || auth.props.serverUrl;
 
   return url.replace(/\/*$/, '');
-}
-
-function isInternalInfrastructure({ auth }: { auth: OroAuth }): boolean {
-  return auth.props.isInternalInfrastructure;
 }
 
 export function getInternalInfrastructureHeaders({ auth }: { auth: OroAuth }): Record<string, string> {

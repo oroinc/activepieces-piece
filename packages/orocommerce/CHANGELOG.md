@@ -11,7 +11,8 @@ Semantic versioning: https://semver.org/
 * Trigger: Oro Webhook Event, signed deliveries on by default; deliveries that cannot be verified
   are discarded.
 * TLS certificates are verified unless the connection's Verify TLS certificate (on by default) is
-  turned off.
+  turned off. For connections with Internal infrastructure on, `ORO_SERVER_VERIFY_TLS` (`true` or
+  `false`, listed in `AP_SANDBOX_PROPAGATED_ENV_VARS`) overrides it.
 * Requests go through the proxy set in `https_proxy`, `http_proxy` and `no_proxy` (or the upper-case
   names), which reach the piece only when `AP_SANDBOX_PROPAGATED_ENV_VARS` lists them. Verify TLS
   certificate applies through the proxy too.

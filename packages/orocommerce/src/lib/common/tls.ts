@@ -56,10 +56,10 @@ function agentFor(tls: { rejectUnauthorized: boolean }): Dispatcher {
 const verifyingAgent = agentFor({ rejectUnauthorized: true });
 
 /**
- * For a connection whose "Verify TLS certificate" is off: a private or self-signed server the user
- * trusts. It is handed to that connection's requests one by one, like the verifying agent, so nothing
- * else changes: no environment variable, no global dispatcher, and every other connection and piece
- * in the worker keeps verifying.
+ * For a connection whose "Verify TLS certificate" is off, or that ORO_SERVER_VERIFY_TLS turns off: a
+ * private or self-signed server the user trusts. It is handed to that connection's requests one by
+ * one, like the verifying agent, so nothing else changes: no environment variable is set, no global
+ * dispatcher, and every other connection and piece in the worker keeps verifying.
  */
 const nonVerifyingAgent = agentFor({ rejectUnauthorized: false });
 
@@ -67,11 +67,53 @@ const nonVerifyingAgent = agentFor({ rejectUnauthorized: false });
  * The one place that decides how a request reaches the connection's server, directly or through
  * the proxy, so every request path picks up the same choice at once.
  *
- * Only an explicit false turns verification off. A connection saved before the option existed has no
- * value for it at all, and it keeps verifying, as does a request made with no connection.
+ * For a connection marked Internal infrastructure, ORO_SERVER_VERIFY_TLS decides when it is set.
+ * Otherwise only an explicit false turns verification off. A connection saved before the option
+ * existed has no value for it at all, and it keeps verifying, as does a request made with no
+ * connection.
  */
 export function dispatcherForConnection({ auth }: { auth: OroAuth | undefined }): Dispatcher {
-  return auth?.props.verifyTlsCertificate === false ? nonVerifyingAgent : verifyingAgent;
+  const fromEnvironment = auth && isInternalInfrastructure({ auth }) ? verifyTlsFromEnvironment() : undefined;
+  const verify = fromEnvironment ?? auth?.props.verifyTlsCertificate !== false;
+  return verify ? verifyingAgent : nonVerifyingAgent;
+}
+
+// Here rather than in client.ts, which imports this module, so that the two do not import each other.
+export function isInternalInfrastructure({ auth }: { auth: OroAuth }): boolean {
+  return auth.props.isInternalInfrastructure;
+}
+
+const VERIFY_TLS_ON = new Set(['true', '1', 'yes', 'on']);
+const VERIFY_TLS_OFF = new Set(['false', '0', 'no', 'off']);
+let reportedUnknownVerifyTls = false;
+
+/**
+ * ORO_SERVER_VERIFY_TLS for a connection marked Internal infrastructure: true or false, or undefined
+ * when it is unset or empty and the connection's own option decides.
+ *
+ * A deployment sets one variable instead of editing each connection: the connections it creates for
+ * itself are marked Internal infrastructure and keep "Verify TLS certificate" at its default. It works
+ * like ORO_SERVER_URL and ORO_SERVER_USER_AGENT in client.ts: only for those connections, and read on
+ * every request rather than at load, so it also covers connections that already exist. Like them, it
+ * reaches the engine only if AP_SANDBOX_PROPAGATED_ENV_VARS lists it.
+ *
+ * A value it does not understand verifies, so a typo cannot turn verification off. It is reported
+ * once per process, not on every request.
+ */
+function verifyTlsFromEnvironment(): boolean | undefined {
+  const raw = process.env['ORO_SERVER_VERIFY_TLS'] ?? '';
+  const value = raw.trim().toLowerCase();
+  if (value === '') {
+    return undefined;
+  }
+  if (VERIFY_TLS_OFF.has(value)) {
+    return false;
+  }
+  if (!VERIFY_TLS_ON.has(value) && !reportedUnknownVerifyTls) {
+    reportedUnknownVerifyTls = true;
+    console.error(`[OroCommerce] ORO_SERVER_VERIFY_TLS="${raw}" not understood, verifying certificates`);
+  }
+  return true;
 }
 
 /**

@@ -327,17 +327,21 @@ connection-based design, not a prop type.
 
 ## Internal-infrastructure escape hatch
 
-The connection has an `isInternalInfrastructure` checkbox. When it is on, and only then,
-`client.ts` reads two environment variables:
+The connection has an `isInternalInfrastructure` checkbox. When it is on, and only then, the piece
+reads three environment variables, on every request:
 
-- `ORO_SERVER_URL` - replaces the connection's Server URL. It applies to **both** the token endpoint
-  and the API base URL, and it is what the token cache key hashes, so flipping it does not reuse a
-  token minted for the old host.
-- `ORO_SERVER_USER_AGENT` - replaces the `User-Agent` of the token request and of every API
-  request, the default and the connection's alike.
+- `ORO_SERVER_URL` (`client.ts`) - replaces the connection's Server URL. It applies to **both** the
+  token endpoint and the API base URL, and it is what the token cache key hashes, so flipping it
+  does not reuse a token minted for the old host.
+- `ORO_SERVER_USER_AGENT` (`client.ts`) - replaces the `User-Agent` of the token request and of
+  every API request, the default and the connection's alike.
+- `ORO_SERVER_VERIFY_TLS` (`tls.ts`) - overrides the connection's Verify TLS certificate:
+  `false`/`0`/`no`/`off` or `true`/`1`/`yes`/`on`, trimmed, in any case. Any other value verifies
+  and is reported once per process. It only picks between the same two agents, so the proxy path
+  and the Custom API Call scope are unchanged.
 
-Both are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client id and
-client secret always come from the connection.
+All three are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client
+id and client secret always come from the connection.
 
 ## Gotchas
 
