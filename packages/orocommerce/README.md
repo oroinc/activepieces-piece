@@ -34,7 +34,7 @@ In Activepieces:
 | **Admin Prefix** | usually `admin` |
 | **Client ID** / **Client Secret** | from the OAuth application |
 | **Default HTTP Headers** | optional JSON object sent with every request |
-| **Internal infrastructure** | leave off |
+| **Internal infrastructure** | leave off, see [Environment variables](#environment-variables) |
 | **Verify TLS certificate** | leave on, see below |
 
 - The OAuth application's user needs read access to regions: the connection check reads one.
@@ -44,39 +44,48 @@ In Activepieces:
 ### Private certificates
 
 For a server whose certificate comes from a private CA, prefer trusting that CA over turning
-verification off: set `NODE_EXTRA_CA_CERTS` to the CA file (PEM) on the worker container and
-`AP_SANDBOX_PROPAGATED_ENV_VARS=NODE_EXTRA_CA_CERTS` on the app container (both on the one container
-in the default single-container setup). The worker starts the engine with an allowlisted
-environment, so the first setting alone does not reach the piece. Restart after changing either.
-Turning **Verify TLS certificate** off is the alternative for a trusted internal URL; it affects
-that connection only.
+verification off: point `NODE_EXTRA_CA_CERTS` at the CA file (PEM), see
+[Environment variables](#environment-variables). Turning **Verify TLS certificate** off is the
+alternative for a trusted internal URL; it affects that connection only.
 
-For connections with **Internal infrastructure** on, `ORO_SERVER_VERIFY_TLS` on the worker container
-overrides **Verify TLS certificate**: `false`, `0`, `no` or `off` turns verification off, and `true`,
-`1`, `yes` or `on` turns it on, in any case. Unset or empty, each connection's own setting decides;
-any other value verifies and logs a warning once. Like `ORO_SERVER_USER_AGENT`, it reaches the piece
-only if `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container lists it; restart after changing it.
-Connections that already exist follow it without being edited. For an internal CA, trusting it with
-`NODE_EXTRA_CA_CERTS` stays the safer choice.
+For connections with **Internal infrastructure** on, `ORO_SERVER_VERIFY_TLS` overrides the
+**Verify TLS certificate** option for all of them at once, connections that already exist included.
+Its values are listed under [Environment variables](#environment-variables). For an internal CA,
+trusting it with `NODE_EXTRA_CA_CERTS` stays the safer choice.
 
 ### Proxy
 
-Requests go through the proxy named in `https_proxy`, `http_proxy` and `no_proxy` (or the upper-case
-names). These reach the piece the same way as the CA file above: set them on the worker container
-and list the same names in `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container (one comma-separated
-list, next to `NODE_EXTRA_CA_CERTS` if that is set), then restart. With none of them set, requests
-connect directly, as before. **Verify TLS certificate** and `ORO_SERVER_VERIFY_TLS` apply through
-the proxy too. Proxy credentials go in the proxy URL, for example
-`http://user:password@proxy.internal:3128`. An https proxy with its own private CA is not covered.
+Requests, the token request included, go through the proxy set in `https_proxy` or `http_proxy`,
+except to hosts in `no_proxy`; see [Environment variables](#environment-variables). With none of
+them set, requests connect directly. **Verify TLS certificate** and `ORO_SERVER_VERIFY_TLS` apply
+through the proxy too. Proxy credentials go in the proxy URL, for example
+`http://user:password@proxy.internal:3128`, and are sent to the proxy only. An https proxy with its
+own private CA is not covered.
 
 ### User-Agent
 
 Every request, the token request included, sends `User-Agent: oroinc-piece-orocommerce/<version>`,
 for example `oroinc-piece-orocommerce/1.0.0`. To send another, put `{"User-Agent": "..."}` in
-**Default HTTP Headers**, or turn **Internal infrastructure** on and set `ORO_SERVER_USER_AGENT` on
-the worker container with `AP_SANDBOX_PROPAGATED_ENV_VARS=ORO_SERVER_USER_AGENT` on the app
-container; that one wins over the connection's. A User-Agent set on a step wins on that step's
-request.
+**Default HTTP Headers**, or turn **Internal infrastructure** on and set `ORO_SERVER_USER_AGENT`
+(see [Environment variables](#environment-variables)); that one wins over the connection's. A
+User-Agent set on a step wins on that step's request.
+
+### Environment variables
+
+| Variable | Read when | Effect |
+| --- | --- | --- |
+| `ORO_SERVER_URL` | **Internal infrastructure** on | replaces the connection's **Server URL** |
+| `ORO_SERVER_USER_AGENT` | **Internal infrastructure** on | User-Agent for every request; one set on a step still wins on that step |
+| `ORO_SERVER_VERIFY_TLS` | **Internal infrastructure** on | overrides **Verify TLS certificate**: `false`, `0`, `no` or `off` turns verification off, `true`, `1`, `yes` or `on` turns it on, in any case; unset or empty leaves it to the checkbox; any other value verifies and logs a warning once |
+| `https_proxy`, `http_proxy`, `no_proxy` (or upper case; lower case wins) | always, when the engine starts | proxy for every request: `https_proxy` for https, falling back to `http_proxy`; hosts in `no_proxy` are reached directly |
+| `NODE_EXTRA_CA_CERTS` | always, when the engine starts | trusts the CA certificates in that PEM file; preferred over turning verification off |
+
+Set them on the worker container. Of the worker's own variables, the engine that runs the piece
+sees only those listed in `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container, so list each name
+there too (one comma-separated list; in the default setup both are the one container), and restart
+after changing any of them. Other pieces that send with Node's `fetch` follow the proxy only with
+Node's own `NODE_USE_ENV_PROXY=1`, listed the same way; this piece reads the proxy variables itself
+and does not need it.
 
 ## Actions
 
