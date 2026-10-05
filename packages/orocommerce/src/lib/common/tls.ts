@@ -3,6 +3,8 @@ import { Agent } from 'undici';
 import { httpClient } from '@activepieces/pieces-common';
 import type { SendRequestOptions } from '@activepieces/pieces-common';
 
+import { withFailureLog } from './request-log';
+
 /**
  * Keep certificate verification on for every request this piece makes.
  *
@@ -53,8 +55,9 @@ export function enforceTlsVerification(): void {
   };
   const original = client.sendRequest.bind(client);
 
+  // Every request of the piece passes here, so this is also where a failed one is logged.
   client.sendRequest = (request: unknown, options?: SendRequestOptions) =>
-    original(request, requestOptionsWithTlsVerification(options));
+    withFailureLog({ request, sent: original(request, requestOptionsWithTlsVerification(options)) });
 }
 
 enforceTlsVerification();

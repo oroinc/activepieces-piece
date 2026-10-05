@@ -14,8 +14,9 @@ Semantic versioning: https://semver.org/
 * The connection sets the Authorization header; one in Default HTTP Headers or on a step is ignored.
 * Custom API Call gets a new token and retries once after a 401.
 * Default HTTP Headers that are not valid JSON fail the step instead of being ignored.
-* Step errors show the HTTP status and the response body only, and failed requests are not written
-  to the engine log, so neither holds the client secret.
+* Step errors show the HTTP status and the response body only, and failed requests are logged as
+  one line with method, address and status, without bodies or credentials, so neither holds the
+  client secret.
 * Redirects are not followed: a 3xx fails the step and the connection check, naming the redirect
   target, instead of quietly reaching another address. Custom API Call's own request keeps its
   Follow redirects option.

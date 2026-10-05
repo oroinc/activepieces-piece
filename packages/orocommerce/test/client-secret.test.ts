@@ -284,14 +284,15 @@ describe('a 401 on the call itself still refreshes the token once and retries', 
 
 /**
  * Upstream's shared client logs every failed request, request body included, to the engine's
- * stderr. scripts/bundle.mjs takes that line out of the artifact, and only the artifact shows it:
- * the sources under test still carry it, so the check runs the built piece in a process of its own
+ * stderr. scripts/bundle.mjs takes that line out of the artifact, and the piece writes its own short
+ * line instead: method, address and status. Only the artifact shows the two together - the sources
+ * under test still carry upstream's line - so the check runs the built piece in a process of its own
  * and reads what that process wrote.
  */
 describe('the built artifact', () => {
   const describeIfBuilt = existsSync(BUNDLE) ? describe : describe.skip;
 
-  describeIfBuilt('writes no request to stderr', () => {
+  describeIfBuilt('writes one short line per failed request to stderr, none of the request', () => {
     const SECRET = 'S3CRET-in-the-child';
     const CUSTOMER_NAME = 'Customer name from the request body';
 
@@ -354,7 +355,17 @@ describe('the built artifact', () => {
         tokenAnswer = 'token';
         messages.push(await failure(createCustomer()));
 
-        console.log('RESULT ' + JSON.stringify({ messages }));
+        // And a transport failure, which upstream's line never covered: a port nothing listens on.
+        const released = createServer();
+        await new Promise((resolve) => released.listen(0, '127.0.0.1', resolve));
+        const closedPort = released.address().port;
+        await new Promise((resolve) => released.close(resolve));
+        const refused = (await orocommerce.auth.validate({
+          auth: { ...props, serverUrl: 'http://127.0.0.1:' + closedPort },
+        })).error;
+
+        const port = server.address().port;
+        console.log('RESULT ' + JSON.stringify({ messages, refused, port, closedPort }));
         server.close();
       `;
 
@@ -367,15 +378,29 @@ describe('the built artifact', () => {
       if (!line) {
         throw new Error(`child produced no result (exit ${status}):\n${stdout}\n${stderr}`);
       }
-      const { messages } = JSON.parse(line.slice('RESULT '.length)) as { messages: string[] };
+      const { messages, refused, port: childPort, closedPort } = JSON.parse(
+        line.slice('RESULT '.length)
+      ) as { messages: string[]; refused: string; port: number; closedPort: number };
 
       // Each case failed, and for the reason the server gave.
       expect(messages.map((message) => message.match(/^OroCommerce API Error \((\d+)\)/)?.[1])).toEqual(
         ['503', '503', '503', '503', '401', '401', '401', '401', '422']
       );
+      expect(refused).toMatch(/ECONNREFUSED/);
+
+      // One line per failed request, with what support needs to start from.
+      const token = `[OroCommerce] POST http://127.0.0.1:${childPort}/oauth2-token failed:`;
+      expect(stderr.split('\n').filter((entry) => entry.startsWith('[OroCommerce]'))).toEqual([
+        ...Array(4).fill(`${token} 503`),
+        ...Array(4).fill(`${token} 401`),
+        `[OroCommerce] POST http://127.0.0.1:${childPort}/admin/api/customers failed: 422`,
+        `[OroCommerce] POST http://127.0.0.1:${closedPort}/oauth2-token failed: ECONNREFUSED`,
+      ]);
+
       expect(leaks({ text: stdout, secret: SECRET })).toEqual([]);
       expect(leaks({ text: stderr, secret: SECRET })).toEqual([]);
       expect(stderr).not.toContain(CUSTOMER_NAME);
+      expect(stderr).not.toContain('Bearer');
       expect(stderr).not.toContain('Request failed');
     });
   });

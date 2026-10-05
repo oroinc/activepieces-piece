@@ -196,7 +196,9 @@ function forceTlsVerification(indexFile) {
  * FetchHttpClient.sendRequest prints the HttpError to stderr before throwing it, and that error
  * carries the request body: on a failed token request the client id and secret, on any other failed
  * call the record being sent. The engine's stderr ends up in the worker's log. The error is thrown
- * either way, so the caller still sees it; only the print goes, and nothing replaces it.
+ * either way, so the caller still sees it; only the print goes. In its place the piece logs a short
+ * line of its own, with the method, address and status only, from
+ * packages/orocommerce/src/lib/common/request-log.ts.
  *
  * Like the TLS opt-out it cannot be changed in .ap-src, so it is cut from the built bundle. The
  * minifier folds the call into the throw (`throw console.error(...),error`), which makes it an
