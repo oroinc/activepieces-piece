@@ -13,9 +13,10 @@ Semantic versioning: https://semver.org/
 * TLS certificates are verified unless the connection's Verify TLS certificate (on by default) is
   turned off. For connections with Internal infrastructure on, `ORO_SERVER_VERIFY_TLS` (`true` or
   `false`, listed in `AP_SANDBOX_PROPAGATED_ENV_VARS`) overrides it.
-* Requests go through the proxy set in `https_proxy`, `http_proxy` and `no_proxy` (or the upper-case
-  names), which reach the piece only when `AP_SANDBOX_PROPAGATED_ENV_VARS` lists them. Verify TLS
-  certificate applies through the proxy too.
+* With Node's `NODE_USE_ENV_PROXY=1`, requests go through the proxy set in `https_proxy`,
+  `http_proxy` and `no_proxy` (or the upper-case names), like those of every other piece that sends
+  with Node's `fetch`. All of them reach the piece only when `AP_SANDBOX_PROPAGATED_ENV_VARS` lists
+  them. Verify TLS certificate applies through the proxy too.
 * Requests, the token request included, send `User-Agent: oroinc-piece-orocommerce/<version>`
   unless Default HTTP Headers or `ORO_SERVER_USER_AGENT` sets another.
 * The connection sets the Authorization header; one in Default HTTP Headers or on a step is ignored.

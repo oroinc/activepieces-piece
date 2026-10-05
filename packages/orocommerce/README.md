@@ -55,9 +55,10 @@ trusting it with `NODE_EXTRA_CA_CERTS` stays the safer choice.
 
 ### Proxy
 
-Requests, the token request included, go through the proxy set in `https_proxy` or `http_proxy`,
-except to hosts in `no_proxy`; see [Environment variables](#environment-variables). With none of
-them set, requests connect directly. **Verify TLS certificate** and `ORO_SERVER_VERIFY_TLS` apply
+With Node's `NODE_USE_ENV_PROXY=1`, requests, the token request included, go through the proxy set
+in `https_proxy` or `http_proxy`, except to hosts in `no_proxy`, like those of every other piece
+that sends with Node's `fetch`; see [Environment variables](#environment-variables). Without it, or
+with no proxy set, requests connect directly. **Verify TLS certificate** and `ORO_SERVER_VERIFY_TLS` apply
 through the proxy too. Proxy credentials go in the proxy URL, for example
 `http://user:password@proxy.internal:3128`, and are sent to the proxy only. An https proxy with its
 own private CA is not covered.
@@ -77,15 +78,14 @@ User-Agent set on a step wins on that step's request.
 | `ORO_SERVER_URL` | **Internal infrastructure** on | replaces the connection's **Server URL** |
 | `ORO_SERVER_USER_AGENT` | **Internal infrastructure** on | User-Agent for every request; one set on a step still wins on that step |
 | `ORO_SERVER_VERIFY_TLS` | **Internal infrastructure** on | overrides **Verify TLS certificate**: `false`, `0`, `no` or `off` turns verification off, `true`, `1`, `yes` or `on` turns it on, in any case; unset or empty leaves it to the checkbox; any other value verifies and logs a warning once |
-| `https_proxy`, `http_proxy`, `no_proxy` (or upper case; lower case wins) | always, when the engine starts | proxy for every request: `https_proxy` for https, falling back to `http_proxy`; hosts in `no_proxy` are reached directly |
+| `NODE_USE_ENV_PROXY` | always, when the engine starts | Node's own switch for the proxy variables below: only `1` turns it on, for this piece and every other piece that sends with Node's `fetch` |
+| `https_proxy`, `http_proxy`, `no_proxy` (or upper case; lower case wins) | with `NODE_USE_ENV_PROXY=1`, when the engine starts | proxy for every request: `https_proxy` for https, falling back to `http_proxy`; hosts in `no_proxy` are reached directly |
 | `NODE_EXTRA_CA_CERTS` | always, when the engine starts | trusts the CA certificates in that PEM file; preferred over turning verification off |
 
 Set them on the worker container. Of the worker's own variables, the engine that runs the piece
 sees only those listed in `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container, so list each name
 there too (one comma-separated list; in the default setup both are the one container), and restart
-after changing any of them. Other pieces that send with Node's `fetch` follow the proxy only with
-Node's own `NODE_USE_ENV_PROXY=1`, listed the same way; this piece reads the proxy variables itself
-and does not need it.
+after changing any of them.
 
 ## Actions
 

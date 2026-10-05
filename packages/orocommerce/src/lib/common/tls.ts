@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { EnvHttpProxyAgent, type Dispatcher } from 'undici';
+import { Agent, EnvHttpProxyAgent, type Dispatcher } from 'undici';
 
 import { httpClient } from '@activepieces/pieces-common';
 import type { SendRequestOptions } from '@activepieces/pieces-common';
@@ -36,12 +36,16 @@ import type { OroAuth } from './types';
  * its public surface. Wrapping the client the action already calls leaves the action untouched and
  * covers every other caller in one place.
  *
- * Both agents also honour the proxy environment variables: http_proxy, https_proxy and no_proxy,
- * each read in lower case first and then in upper case. undici reads the proxy URLs once, when the
- * agent is built, and that is when this module loads, so the variables have to be in the engine's
- * environment when it starts. Activepieces passes a variable from the worker to the engine only if
- * AP_SANDBOX_PROPAGATED_ENV_VARS lists it. With none of them set, the agent connects directly, as a
- * plain Agent would.
+ * The proxy is one switch for the whole service, not a setting of this piece: with Node's
+ * NODE_USE_ENV_PROXY=1, every fetch in the engine follows http_proxy, https_proxy and no_proxy. This
+ * piece follows the same switch only because it must pass its own dispatcher to keep certificate
+ * verification, and that replaces the one Node installs for the proxy. So the agents go through the
+ * proxy exactly when Node's fetch does, and they read the variables the way it does: undici's
+ * defaults match Node's in the names and their letter case (lower case first, https falling back to
+ * http_proxy) and, from Node 24.14.1, in how no_proxy matches, so no httpProxy, httpsProxy or
+ * noProxy is passed. Like Node, the switch and the proxy URLs are read once, when this module loads,
+ * so they have to be in the engine's environment when it starts. Activepieces passes a variable from
+ * the worker to the engine only if AP_SANDBOX_PROPAGATED_ENV_VARS lists it.
  *
  * The TLS options go in twice. `connect` is used when the agent connects to the server directly.
  * Through a CONNECT proxy, undici replaces `connect` with its own tunnel and starts TLS with the
@@ -50,8 +54,33 @@ import type { OroAuth } from './types';
  * (`proxyTls`) is left at its defaults, so an https proxy with a private CA is not covered.
  */
 function agentFor(tls: { rejectUnauthorized: boolean }): Dispatcher {
-  return new EnvHttpProxyAgent({ connect: tls, requestTls: tls });
+  return useEnvProxy ? new EnvHttpProxyAgent({ connect: tls, requestTls: tls }) : new Agent({ connect: tls });
 }
+
+/**
+ * Node's own decision: NODE_USE_ENV_PROXY set to exactly 1, or --use-env-proxy in NODE_OPTIONS or on
+ * the command line, in any of the spellings Node accepts. Of --use-env-proxy and --no-use-env-proxy
+ * the last one wins, and the command line comes after NODE_OPTIONS. A Node without the option
+ * ignores all of them, and so does this.
+ */
+function nodeUsesEnvProxy(): boolean {
+  if (!process.allowedNodeEnvironmentFlags.has('--use-env-proxy')) {
+    return false;
+  }
+  let enabled = process.env['NODE_USE_ENV_PROXY'] === '1';
+  const nodeOptions = (process.env['NODE_OPTIONS'] ?? '').split(/\s+/).map((option) => option.replace(/^"(.*)"$/, '$1'));
+  for (const option of [...nodeOptions, ...process.execArgv]) {
+    const name = option.replace(/=.*$/, '').replace(/_/g, '-');
+    if (name === '--use-env-proxy') {
+      enabled = true;
+    } else if (name === '--no-use-env-proxy') {
+      enabled = false;
+    }
+  }
+  return enabled;
+}
+
+const useEnvProxy = nodeUsesEnvProxy();
 
 const verifyingAgent = agentFor({ rejectUnauthorized: true });
 

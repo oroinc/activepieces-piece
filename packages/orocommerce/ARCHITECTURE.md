@@ -160,8 +160,11 @@ The wrapper is what reaches `Custom API Call`: `createCustomApiCallAction` build
 internally and calls `sendRequest` with no options, so there is no argument to pass a dispatcher
 through.
 
-The dispatcher is an `EnvHttpProxyAgent`, so `http_proxy`, `https_proxy` and `no_proxy` (lower case
-first) apply. It reads the proxy URLs when `tls.ts` loads. Through a CONNECT proxy undici ignores
+An explicit dispatcher replaces the one Node installs for its own proxy switch, so the piece follows
+that switch itself. With `NODE_USE_ENV_PROXY=1` (or `--use-env-proxy`) the dispatcher is an
+`EnvHttpProxyAgent`, so `http_proxy`, `https_proxy` and `no_proxy` (lower case first) apply, as they
+do for Node's `fetch`; otherwise it is a plain `Agent`. Both the switch and the proxy URLs are read
+when `tls.ts` loads. Through a CONNECT proxy undici ignores
 `connect` and starts TLS with the server from `requestTls`, so the TLS options are given in both;
 without `requestTls` a proxied request would follow `NODE_TLS_REJECT_UNAUTHORIZED` again.
 `test/proxy.test.ts` runs the artifact behind a local proxy.
