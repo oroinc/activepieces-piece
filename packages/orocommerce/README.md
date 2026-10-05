@@ -75,17 +75,31 @@ User-Agent set on a step wins on that step's request.
 
 | Variable | Read when | Effect |
 | --- | --- | --- |
-| `ORO_SERVER_URL` | **Internal infrastructure** on | replaces the connection's **Server URL** |
+| `ORO_SERVER_URL` | **Internal infrastructure** on | replaces the connection's **Server URL**; see [Internal and external Oro in one Activepieces](#internal-and-external-oro-in-one-activepieces) |
 | `ORO_SERVER_USER_AGENT` | **Internal infrastructure** on | User-Agent for every request; one set on a step still wins on that step |
 | `ORO_SERVER_VERIFY_TLS` | **Internal infrastructure** on | overrides **Verify TLS certificate**: `false`, `0`, `no` or `off` turns verification off, `true`, `1`, `yes` or `on` turns it on, in any case; unset or empty leaves it to the checkbox; any other value verifies and logs a warning once |
 | `NODE_USE_ENV_PROXY` | always, when the engine starts | Node's own switch for the proxy variables below: only `1` turns it on, for this piece and every other piece that sends with Node's `fetch` |
-| `https_proxy`, `http_proxy`, `no_proxy` (or upper case; lower case wins) | with `NODE_USE_ENV_PROXY=1`, when the engine starts | proxy for every request: `https_proxy` for https, falling back to `http_proxy`; hosts in `no_proxy` are reached directly |
+| `https_proxy`, `http_proxy`, `no_proxy` (or upper case; lower case wins) | with `NODE_USE_ENV_PROXY=1`, when the engine starts | proxy for every request: `https_proxy` for https, falling back to `http_proxy`; hosts in `no_proxy` are reached directly, see [Internal and external Oro in one Activepieces](#internal-and-external-oro-in-one-activepieces) |
 | `NODE_EXTRA_CA_CERTS` | always, when the engine starts | trusts the CA certificates in that PEM file; preferred over turning verification off |
 
 Set them on the worker container. Of the worker's own variables, the engine that runs the piece
 sees only those listed in `AP_SANDBOX_PROPAGATED_ENV_VARS` on the app container, so list each name
 there too (one comma-separated list; in the default setup both are the one container), and restart
 after changing any of them.
+
+### Internal and external Oro in one Activepieces
+
+One Activepieces can connect to an internal and an external Oro at the same time, with one
+connection each. Turn **Internal infrastructure** on for the internal connection only:
+`ORO_SERVER_URL`, `ORO_SERVER_USER_AGENT` and `ORO_SERVER_VERIFY_TLS` apply only to connections
+that have it on. The external connection keeps its own **Server URL**, **Verify TLS certificate**
+and User-Agent, and with `NODE_USE_ENV_PROXY=1` it goes through the proxy. For the internal
+connection to reach its server directly, list the internal host in `no_proxy`. It is matched per
+host, so use the exact host name: on Node 24.14.0 this piece and Node's own `fetch` match domain
+suffixes and wildcards differently. In **Custom API Call** on the internal connection, enter a path
+such as `customers`; a full URL is sent to the host it names. List every one of these variables in
+`AP_SANDBOX_PROPAGATED_ENV_VARS`. The worker itself needs `NODE_USE_ENV_PROXY=1` as well, since it
+downloads pieces with Node's `fetch`.
 
 ## Actions
 
