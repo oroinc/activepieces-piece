@@ -345,6 +345,8 @@ reads three environment variables, on every request:
 
 All three are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client
 id and client secret always come from the connection.
+`test/two-connections.test.ts` runs an internal and an external connection side by side in one
+process of the artifact, behind a local proxy with the internal host in `NO_PROXY`.
 
 ## Gotchas
 
