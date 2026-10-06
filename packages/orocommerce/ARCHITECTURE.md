@@ -178,6 +178,34 @@ verification on the first request a flow makes. `test/tls-verification.test.ts` 
 through the global `fetch` rather than comparing versions, and CI runs the suite on Node 20 and on
 Node 24, so a mismatch fails the build.
 
+## Secrets, the failure log and redirects
+
+The client secret stays out of step errors and logs. Upstream's `HttpError` writes the request body
+into its message, and the token request's body is the client id and secret, so `requestAccessToken`
+rethrows through `withoutRequestBody` (same status and response body, no request). Errors leaving
+`oroApiCall` and `Custom API Call` (`runWithFormattedErrors` in `api-call.ts`) go through
+`formatError`: the status and the response body only. Upstream's `FetchHttpClient` also prints every
+failed request's `HttpError` to stderr; `scripts/bundle.mjs` cuts that print from the bundle, with
+the same exactly-one-match rule as the TLS opt-out. In its place the patched `sendRequest` in
+`tls.ts` logs one line per failed request (`src/lib/common/request-log.ts`):
+
+```
+[OroCommerce] POST https://shop.example.com/oauth2-token failed: 401
+```
+
+The address is the origin and path only, without query string, fragment or credentials. The reason
+is the HTTP status or, for a transport failure, the error code (`ECONNREFUSED`,
+`DEPTH_ZERO_SELF_SIGNED_CERT`) or name (`AbortError` for a timeout), never a message, header or body.
+
+Redirects are not followed. `oroApiCall` and the token request send `followRedirects: false`, the
+shared client hands a 3xx back as a success, and `failOnRedirect` turns it into an error naming the
+status and the `Location`. Following one would drop `Authorization` across hosts and turn a POST
+into a GET, so a create could report success against a login page. A redirect is not a failed
+request to the shared client, so it gets no log line; the step error carries it. `Custom API Call`'s
+own request is upstream's and keeps its Follow redirects option: off, an API 3xx is returned as the
+step's output (`test/redirects.test.ts`); on, fetch follows it. Its token request fails on a
+redirect like every other path.
+
 ## Dropdowns and paging
 
 All shared dropdowns are built from `loadDropdownOptions` in `src/lib/common/props.ts`, in two
