@@ -134,8 +134,7 @@ registers the webhook in Oro; disabling it removes it.
 ## Versions
 
 Semantic versioning. A flow keeps the piece version it was built with; to upgrade, install the new
-version, then update each flow's steps. Changes:
-[CHANGELOG.md](https://github.com/oroinc/activepieces-piece/blob/main/packages/orocommerce/CHANGELOG.md).
+version, then update each flow's steps.
 
 ## Issues
 
