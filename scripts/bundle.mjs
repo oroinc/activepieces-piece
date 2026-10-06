@@ -103,6 +103,7 @@ export function bundle() {
   cpSync(builtDist, localDist, { recursive: true });
 
   forceTlsVerification(join(localDist, 'src', 'index.js'));
+  removeFailedRequestLog(join(localDist, 'src', 'index.js'));
 
   console.log('Writing README, LICENSE and NOTICE into the package');
   // README, LICENSE and NOTICE ship; other docs stay out because only what is copied into dist is
@@ -187,6 +188,51 @@ function forceTlsVerification(indexFile) {
 
   writeFileSync(indexFile, patched);
   console.log('Removed the bundled NODE_TLS_REJECT_UNAUTHORIZED opt-out (1 occurrence)');
+}
+
+/**
+ * Take upstream's log of every failed request out of the artifact.
+ *
+ * FetchHttpClient.sendRequest prints the HttpError to stderr before throwing it, and that error
+ * carries the request body: on a failed token request the client id and secret, on any other failed
+ * call the record being sent. The engine's stderr ends up in the worker's log. The error is thrown
+ * either way, so the caller still sees it; only the print goes. In its place the piece logs a short
+ * line of its own, with the method, address and status only, from
+ * packages/orocommerce/src/lib/common/request-log.ts.
+ *
+ * Like the TLS opt-out it cannot be changed in .ap-src, so it is cut from the built bundle. The
+ * minifier folds the call into the throw (`throw console.error(...),error`), which makes it an
+ * expression, not a statement, so it is replaced with `void 0` rather than deleted: an expression in
+ * place of an expression is valid wherever the call sits.
+ *
+ * The count has to be exactly one, for the same reasons as above: zero means upstream reworded or
+ * moved it and the secret would be printed again, more than one means a second site to look at.
+ */
+function removeFailedRequestLog(indexFile) {
+  const LOG_CALL =
+    /console\.error\(\s*(["'`])\[HttpClient#\(sanitized error message\)\] Request failed:\1\s*,\s*[A-Za-z_$][\w$]*\s*\)/g;
+  const source = readFileSync(indexFile, 'utf8');
+  const found = source.match(LOG_CALL) ?? [];
+
+  if (found.length !== 1) {
+    throw new Error(
+      `Expected exactly one failed-request console.error in ${indexFile}, found ${found.length}. ` +
+        'Upstream changed how it logs failed requests. Re-read ' +
+        'packages/pieces/common/src/lib/http/core/fetch-http-client.ts at the pinned commit and update ' +
+        'removeFailedRequestLog in scripts/bundle.mjs before releasing.',
+    );
+  }
+
+  const patched = source.replace(LOG_CALL, 'void 0');
+  if (patched.includes('[HttpClient#')) {
+    throw new Error(
+      `${indexFile} still mentions [HttpClient# after the failed-request log was removed. ` +
+        'Something else in the bundle logs from the HTTP client; check before releasing.',
+    );
+  }
+
+  writeFileSync(indexFile, patched);
+  console.log('Removed the bundled failed-request log (1 occurrence)');
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
