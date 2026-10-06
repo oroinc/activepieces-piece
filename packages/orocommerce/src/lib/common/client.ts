@@ -19,8 +19,16 @@ import {
   type FetchCollectionParams,
 } from './types';
 import { jsonApiBodyUtils } from './jsonapi';
-// Imported for its side effect: installing it here covers every caller of the shared client.
-import './tls';
+// Importing it also installs its patch on the shared client, which covers every caller of it.
+import { dispatcherForConnection, isInternalInfrastructure } from './tls';
+import { version } from '../../../package.json';
+
+/**
+ * What every request says it comes from, unless the connection or the environment names something
+ * else. Without it fetch sends "node", which tells an access log or a firewall rule nothing. The
+ * bundler inlines the version from package.json, so it is always the version being shipped.
+ */
+export const DEFAULT_USER_AGENT = `oroinc-piece-orocommerce/${version}`;
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 const inFlightTokenRequests = new Map<string, Promise<string>>();
@@ -71,10 +79,6 @@ function getOroServerUrl(auth: OroAuth): string {
   return url.replace(/\/*$/, '');
 }
 
-function isInternalInfrastructure({ auth }: { auth: OroAuth }): boolean {
-  return auth.props.isInternalInfrastructure;
-}
-
 export function getInternalInfrastructureHeaders({ auth }: { auth: OroAuth }): Record<string, string> {
   if (!isInternalInfrastructure({ auth })) {
     return {};
@@ -85,6 +89,45 @@ export function getInternalInfrastructureHeaders({ auth }: { auth: OroAuth }): R
   }
 
   return { 'User-Agent': userAgent };
+}
+
+/**
+ * The headers every request of the connection starts from, lowest first: the default User-Agent,
+ * the connection's Default HTTP Headers, then the internal infrastructure User-Agent. A step's own
+ * headers go on top of these.
+ */
+export function getBaseHeaders({ auth }: { auth: OroAuth }): Record<string, string> {
+  return mergeHeaders(
+    { 'User-Agent': DEFAULT_USER_AGENT },
+    getConnectionHeaders({ auth }),
+    getInternalInfrastructureHeaders({ auth }),
+  );
+}
+
+/**
+ * Only the User-Agent of the base headers, for the token request. It goes out with the same
+ * User-Agent as the API calls, but none of the connection's other headers.
+ */
+function getUserAgentHeader({ auth }: { auth: OroAuth }): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(getBaseHeaders({ auth })).filter(([key]) => key.toLowerCase() === 'user-agent'),
+  );
+}
+
+/**
+ * Lay header sets over each other, lowest first, as object spread does, but with names matched
+ * whatever their case. Spread keeps "user-agent" and "User-Agent" as two keys, and the shared client
+ * then keeps whichever comes last in key order, which is not always the set that should win. A
+ * name keeps the spelling of the set that set it last.
+ */
+export function mergeHeaders(...sets: Array<Record<string, string> | undefined>): Record<string, string> {
+  const merged = new Map<string, [string, string]>();
+  for (const set of sets) {
+    for (const [key, value] of Object.entries(set ?? {})) {
+      merged.set(key.toLowerCase(), [key, value]);
+    }
+  }
+  return Object.fromEntries(merged.values());
 }
 
 export function getOroAdminApiBaseUrl({ auth }: { auth: OroAuth }): string {
@@ -191,11 +234,7 @@ export async function oroApiCall({
         // Stripped once more over the merged set: the shared client applies `authentication` first
         // and then spreads these over it, so an Authorization key surviving here would win.
         ...withoutAuthorization({
-          headers: {
-            ...getConnectionHeaders({ auth }),
-            ...getInternalInfrastructureHeaders({ auth }),
-            ...extraHeaders,
-          },
+          headers: mergeHeaders(getBaseHeaders({ auth }), extraHeaders),
         }),
       },
       authentication: {
@@ -204,7 +243,7 @@ export async function oroApiCall({
       },
       queryParams,
       body: sanitizeJsonApiBody({ body }),
-    });
+    }, { dispatcher: dispatcherForConnection({ auth }) });
     failOnRedirect({ response });
     return response;
   };
@@ -280,14 +319,14 @@ async function requestAccessToken({
     followRedirects: false,
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      ...getInternalInfrastructureHeaders({ auth }),
+      ...getUserAgentHeader({ auth }),
     },
     body: new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: auth.props.clientId,
       client_secret: auth.props.clientSecret,
     }).toString(),
-  }).catch((error: unknown) => {
+  }, { dispatcher: dispatcherForConnection({ auth }) }).catch((error: unknown) => {
     throw withoutRequestBody({ error });
   });
 

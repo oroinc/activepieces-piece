@@ -108,10 +108,15 @@ Every action except `Custom API Call` goes through `oroApiCall`, where later win
 
 ```
 Content-Type: application/vnd.api+json   (built in)
+  → User-Agent: oroinc-piece-orocommerce/<version>   (built in)
   → connection "Default HTTP Headers"
   → internal-infrastructure User-Agent
   → the step's Additional Headers
 ```
+
+`mergeHeaders` matches names whatever their case, so a later set wins even when it spells a name
+differently. The token request gets the User-Agent those sets end with, and none of their other
+headers.
 
 `Authorization` is not one of them. The shared client applies the request's `authentication` first
 and then spreads the request headers over it, so a header named `Authorization` used to win the merge
@@ -123,7 +128,8 @@ in upstream Activepieces, at `.ap-pin`), which merges `{...stepHeaders, ...authM
 the step's own headers land *first*, so whatever `authMapping` returns would normally beat them.
 That is why `authMapping` in `src/lib/actions/api-call.ts` re-applies
 `toHeaderRecord({ value: propsValue['headers'] })` after the connection headers: it restores the
-same precedence as above.
+same precedence as above. `mergeHeaders` keeps the step's spelling of each name it sets, so
+upstream's first spread and this one land on the same key.
 `propsValue` is the second argument `createCustomApiCallAction` hands to `authMapping`; without
 using it the step's headers would silently lose to the connection's. `Authorization` is appended
 last and always wins.
@@ -146,13 +152,22 @@ Two things put it back, and both are needed:
 - `scripts/bundle.mjs` removes the assignment from the built bundle. It requires exactly one match
   and fails the build otherwise, so an upstream rewording stops the release rather than quietly
   restoring the opt-out. `.ap-src` is never patched; `ap:check-clean` would catch that.
-- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici `Agent` with
+- `src/lib/common/tls.ts` wraps the shared client so every request carries an undici dispatcher with
   `rejectUnauthorized: true`. An explicit value on the socket is read instead of the environment
   variable, which is the only way to hold when *another* piece has already set it to `'0'`.
 
 The wrapper is what reaches `Custom API Call`: `createCustomApiCallAction` builds its request
 internally and calls `sendRequest` with no options, so there is no argument to pass a dispatcher
 through.
+
+An explicit dispatcher replaces the one Node installs for its own proxy switch, so the piece follows
+that switch itself. With `NODE_USE_ENV_PROXY=1` (or `--use-env-proxy`) the dispatcher is an
+`EnvHttpProxyAgent`, so `http_proxy`, `https_proxy` and `no_proxy` (lower case first) apply, as they
+do for Node's `fetch`; otherwise it is a plain `Agent`. Both the switch and the proxy URLs are read
+when `tls.ts` loads. Through a CONNECT proxy undici ignores
+`connect` and starts TLS with the server from `requestTls`, so the TLS options are given in both;
+without `requestTls` a proxied request would follow `NODE_TLS_REJECT_UNAUTHORIZED` again.
+`test/proxy.test.ts` runs the artifact behind a local proxy.
 
 `undici` is pinned to `7.30.0` and bundled into the artifact, since the Activepieces image has no
 resolvable `undici` of its own. The version needs care, though not version matching: undici 6 and 7
@@ -162,6 +177,34 @@ undici 8 is not. It reworked the handler interface, so a dispatcher built by it 
 verification on the first request a flow makes. `test/tls-verification.test.ts` sends a real request
 through the global `fetch` rather than comparing versions, and CI runs the suite on Node 20 and on
 Node 24, so a mismatch fails the build.
+
+## Secrets, the failure log and redirects
+
+The client secret stays out of step errors and logs. Upstream's `HttpError` writes the request body
+into its message, and the token request's body is the client id and secret, so `requestAccessToken`
+rethrows through `withoutRequestBody` (same status and response body, no request). Errors leaving
+`oroApiCall` and `Custom API Call` (`runWithFormattedErrors` in `api-call.ts`) go through
+`formatError`: the status and the response body only. Upstream's `FetchHttpClient` also prints every
+failed request's `HttpError` to stderr; `scripts/bundle.mjs` cuts that print from the bundle, with
+the same exactly-one-match rule as the TLS opt-out. In its place the patched `sendRequest` in
+`tls.ts` logs one line per failed request (`src/lib/common/request-log.ts`):
+
+```
+[OroCommerce] POST https://shop.example.com/oauth2-token failed: 401
+```
+
+The address is the origin and path only, without query string, fragment or credentials. The reason
+is the HTTP status or, for a transport failure, the error code (`ECONNREFUSED`,
+`DEPTH_ZERO_SELF_SIGNED_CERT`) or name (`AbortError` for a timeout), never a message, header or body.
+
+Redirects are not followed. `oroApiCall` and the token request send `followRedirects: false`, the
+shared client hands a 3xx back as a success, and `failOnRedirect` turns it into an error naming the
+status and the `Location`. Following one would drop `Authorization` across hosts and turn a POST
+into a GET, so a create could report success against a login page. A redirect is not a failed
+request to the shared client, so it gets no log line; the step error carries it. `Custom API Call`'s
+own request is upstream's and keeps its Follow redirects option: off, an API 3xx is returned as the
+step's output (`test/redirects.test.ts`); on, fetch follows it. Its token request fails on a
+redirect like every other path.
 
 ## Dropdowns and paging
 
@@ -315,17 +358,23 @@ connection-based design, not a prop type.
 
 ## Internal-infrastructure escape hatch
 
-The connection has an `isInternalInfrastructure` checkbox. When it is on, and only then,
-`client.ts` reads two environment variables:
+The connection has an `isInternalInfrastructure` checkbox. When it is on, and only then, the piece
+reads three environment variables, on every request:
 
-- `ORO_SERVER_URL` - replaces the connection's Server URL. It applies to **both** the token endpoint
-  and the API base URL, and it is what the token cache key hashes, so flipping it does not reuse a
-  token minted for the old host.
-- `ORO_SERVER_USER_AGENT` - adds a `User-Agent` header to the token request and to every API
-  request.
+- `ORO_SERVER_URL` (`client.ts`) - replaces the connection's Server URL. It applies to **both** the
+  token endpoint and the API base URL, and it is what the token cache key hashes, so flipping it
+  does not reuse a token minted for the old host.
+- `ORO_SERVER_USER_AGENT` (`client.ts`) - replaces the `User-Agent` of the token request and of
+  every API request, the default and the connection's alike.
+- `ORO_SERVER_VERIFY_TLS` (`tls.ts`) - overrides the connection's Verify TLS certificate:
+  `false`/`0`/`no`/`off` or `true`/`1`/`yes`/`on`, trimmed, in any case. Any other value verifies
+  and is reported once per process. It only picks between the same two agents, so the proxy path
+  and the Custom API Call scope are unchanged.
 
-Both are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client id and
-client secret always come from the connection.
+All three are ignored when the checkbox is off or the variable is empty. The `adminPrefix`, client
+id and client secret always come from the connection.
+`test/two-connections.test.ts` runs an internal and an external connection side by side in one
+process of the artifact, behind a local proxy with the internal host in `NO_PROXY`.
 
 ## Gotchas
 

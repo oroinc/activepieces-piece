@@ -147,7 +147,6 @@ MAINTAINERS.md             maintainers, build, release
 .github/workflows/           CI on every pull request, release on every v*.*.* tag
 packages/orocommerce/      the piece, and the package that is published
 packages/orocommerce/README.md   the npm page; the only document that ships
-packages/orocommerce/CHANGELOG.md  what changed in each version
 packages/orocommerce/ARCHITECTURE.md  how the piece is built and why
 packages/orocommerce/metadata.snapshot.json  the surface CI holds the build to
 ```

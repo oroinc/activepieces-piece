@@ -56,6 +56,13 @@
         "description": "The base URL of your OroCommerce instance (e.g., https://your-store.com).",
         "required": true,
         "defaultValue": null
+      },
+      "verifyTlsCertificate": {
+        "type": "CHECKBOX",
+        "displayName": "Verify TLS certificate",
+        "description": "Turn off only for a private or self-signed server you trust, for example an internal OroCloud URL. Adding its CA certificate is safer (see the README).",
+        "required": false,
+        "defaultValue": true
       }
     }
   },

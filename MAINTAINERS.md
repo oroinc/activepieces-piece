@@ -113,7 +113,7 @@ Node 20 and Node 24, so a mismatch fails the build rather than the first flow.
 ## Release
 
 1. In the pull request with the change, bump the version in `packages/orocommerce/package.json`
-   (semver) and add a `## <version>` entry to `packages/orocommerce/CHANGELOG.md`.
+   (semver).
    - major: a flow someone already built can break (action, trigger or prop removed or renamed, new
      required prop, changed prop type);
    - minor: new action, trigger or optional prop;
