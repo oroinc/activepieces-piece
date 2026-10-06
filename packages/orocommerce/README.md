@@ -37,6 +37,8 @@ In Activepieces:
 | **Internal infrastructure** | leave off, see [Environment variables](#environment-variables) |
 | **Verify TLS certificate** | leave on, see below |
 
+- The Server URL must be the final address: redirects (http to https, to www, to a login page) are
+  not followed and fail the step.
 - The OAuth application's user needs read access to regions: the connection check reads one.
 - The OAuth application's organization limits what the connection can see. A record from another
   organization returns `403 No access to the entity`. Use one connection per organization.
